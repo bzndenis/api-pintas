@@ -11,6 +11,9 @@ use Ramsey\Uuid\Uuid;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
+// Import fungsi global
+use function public_path;
+
 class LoginMiddleware
 {
     public function handle($request, Closure $next)
@@ -108,7 +111,7 @@ class LoginMiddleware
     {
         try {
             $today = Carbon::now()->format('Y-m-d');
-            $filename = "logs/activities/{$today}.json";
+            $filename = base_path('public') . "/logs/activities/{$today}.json";
             
             // Buat struktur data aktivitas
             $activityData = [
@@ -122,9 +125,9 @@ class LoginMiddleware
             ];
             
             // Periksa apakah file sudah ada
-            if (Storage::exists($filename)) {
+            if (file_exists($filename)) {
                 // Baca file yang sudah ada
-                $currentData = json_decode(Storage::get($filename), true);
+                $currentData = json_decode(file_get_contents($filename), true);
                 if (!is_array($currentData)) {
                     $currentData = [];
                 }
@@ -133,16 +136,16 @@ class LoginMiddleware
                 $currentData[] = $activityData;
                 
                 // Simpan kembali file
-                Storage::put($filename, json_encode($currentData, JSON_PRETTY_PRINT));
+                file_put_contents($filename, json_encode($currentData, JSON_PRETTY_PRINT));
             } else {
                 // Buat direktori jika belum ada
                 $directory = dirname($filename);
-                if (!Storage::exists($directory)) {
-                    Storage::makeDirectory($directory, 0755, true);
+                if (!file_exists($directory)) {
+                    mkdir($directory, 0755, true);
                 }
                 
                 // Simpan data ke file baru
-                Storage::put($filename, json_encode([$activityData], JSON_PRETTY_PRINT));
+                file_put_contents($filename, json_encode([$activityData], JSON_PRETTY_PRINT));
             }
         } catch (\Exception $e) {
             \Log::error('Gagal menyimpan log ke file: ' . $e->getMessage());

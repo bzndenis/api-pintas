@@ -7,9 +7,12 @@ use App\Models\UserSession;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Ramsey\Uuid\Uuid;
+use Illuminate\Support\Facades\Storage;
+
+// Import fungsi global
+use function public_path;
 
 class UserActivityController extends Controller
 {
@@ -161,16 +164,16 @@ class UserActivityController extends Controller
             $userId = $request->input('user_id_filter', $request->user_id);
             $date = $request->input('date', Carbon::now()->format('Y-m-d'));
             
-            $filename = "logs/activities/{$date}.json";
+            $filename = base_path('public') . "/logs/activities/{$date}.json";
             
-            if (!Storage::exists($filename)) {
+            if (!file_exists($filename)) {
                 return ResponseBuilder::success(200, "Data Tidak Ditemukan", [
                     'logs' => [],
                     'date' => $date
                 ]);
             }
             
-            $allLogs = json_decode(Storage::get($filename), true);
+            $allLogs = json_decode(file_get_contents($filename), true);
             
             // Filter log berdasarkan user_id
             $userLogs = array_filter($allLogs, function($log) use ($userId) {
@@ -196,22 +199,26 @@ class UserActivityController extends Controller
     {
         try {
             $userId = $request->input('user_id_filter', $request->user_id);
+            $activitiesPath = base_path('public') . '/logs/activities';
             
-            $directories = Storage::directories('logs/activities');
+            if (!is_dir($activitiesPath)) {
+                return ResponseBuilder::success(200, "Data Tidak Ditemukan", [
+                    'dates' => []
+                ]);
+            }
+            
             $availableDates = [];
+            $files = glob($activitiesPath . '/*.json');
             
-            foreach ($directories as $directory) {
-                $date = basename($directory);
-                $filename = "logs/activities/{$date}.json";
+            foreach ($files as $file) {
+                $date = pathinfo($file, PATHINFO_FILENAME);
+                $logs = json_decode(file_get_contents($file), true);
                 
-                if (Storage::exists($filename)) {
-                    $logs = json_decode(Storage::get($filename), true);
-                    // Cek apakah ada log untuk user ini
-                    foreach ($logs as $log) {
-                        if ($log['user_id'] === $userId) {
-                            $availableDates[] = $date;
-                            break;
-                        }
+                // Cek apakah ada log untuk user ini
+                foreach ($logs as $log) {
+                    if ($log['user_id'] === $userId) {
+                        $availableDates[] = $date;
+                        break;
                     }
                 }
             }
@@ -321,6 +328,65 @@ class UserActivityController extends Controller
             ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, $e->getMessage(), null);
+        }
+    }
+
+    public function getUsageTime(Request $request)
+    {
+        try {
+            $userId = $request->user_id;
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
+            
+            // Query untuk mendapatkan total durasi dari sesi aktif
+            $query = UserSession::where('user_id', $userId)
+                ->where('status', 'expired'); // Hanya ambil sesi yang sudah selesai
+                
+            if ($startDate && $endDate) {
+                $query->whereBetween('login_time', [
+                    $startDate . ' 00:00:00',
+                    $endDate . ' 23:59:59'
+                ]);
+            }
+            
+            // Hitung total durasi dalam detik
+            $totalDuration = $query->sum('duration');
+            
+            // Hitung sesi yang masih aktif
+            $activeSession = UserSession::where('user_id', $userId)
+                ->where('status', 'active')
+                ->first();
+                
+            $currentDuration = 0;
+            if ($activeSession) {
+                $currentDuration = Carbon::now()->diffInSeconds($activeSession->login_time);
+            }
+            
+            // Format durasi ke dalam jam:menit:detik
+            $totalSeconds = $totalDuration + $currentDuration;
+            $hours = floor($totalSeconds / 3600);
+            $minutes = floor(($totalSeconds % 3600) / 60);
+            $seconds = $totalSeconds % 60;
+            
+            $formattedDuration = sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data waktu penggunaan", [
+                'total_duration_seconds' => $totalSeconds,
+                'formatted_duration' => $formattedDuration,
+                'active_session' => $activeSession ? [
+                    'login_time' => $activeSession->login_time,
+                    'duration' => $currentDuration,
+                    'formatted_current_duration' => sprintf(
+                        '%02d:%02d:%02d',
+                        floor($currentDuration / 3600),
+                        floor(($currentDuration % 3600) / 60),
+                        $currentDuration % 60
+                    )
+                ] : null
+            ]);
+            
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data waktu penggunaan: " . $e->getMessage());
         }
     }
 } 

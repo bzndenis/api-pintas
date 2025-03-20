@@ -3,10 +3,13 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\UserActivity;
 use App\Models\UserSession;
+use Illuminate\Support\Facades\Storage;
+
+// Import fungsi global
+use function base_path;
 
 class CleanupActivityLogs extends Command
 {
@@ -80,14 +83,13 @@ class CleanupActivityLogs extends Command
         $activities = UserActivity::where('created_at', '<', $cutoffDate)
             ->orderBy('created_at')
             ->chunk(1000, function ($chunk) {
-                // Kelompokkan berdasarkan tanggal dan user_id
+                // Kelompokkan berdasarkan tanggal
                 $grouped = $chunk->groupBy(function($activity) {
-                    $date = Carbon::parse($activity->created_at)->format('Y-m-d');
-                    return "archives/{$date}/{$activity->user_id}";
+                    return Carbon::parse($activity->created_at)->format('Y-m-d');
                 });
                 
-                foreach ($grouped as $path => $items) {
-                    $filename = "logs/{$path}_activities.json";
+                foreach ($grouped as $date => $items) {
+                    $filename = base_path('public') . "/logs/archives/activities/{$date}.json";
                     
                     // Simpan ke file
                     $this->saveToJsonFile($filename, $items->toArray());
@@ -108,14 +110,13 @@ class CleanupActivityLogs extends Command
         UserSession::where('login_time', '<', $cutoffDate)
             ->orderBy('login_time')
             ->chunk(1000, function ($chunk) {
-                // Kelompokkan berdasarkan tanggal dan user_id
+                // Kelompokkan berdasarkan tanggal
                 $grouped = $chunk->groupBy(function($session) {
-                    $date = Carbon::parse($session->login_time)->format('Y-m-d');
-                    return "archives/{$date}/{$session->user_id}";
+                    return Carbon::parse($session->login_time)->format('Y-m-d');
                 });
                 
-                foreach ($grouped as $path => $items) {
-                    $filename = "logs/{$path}_sessions.json";
+                foreach ($grouped as $date => $items) {
+                    $filename = base_path('public') . "/logs/archives/sessions/{$date}.json";
                     
                     // Simpan ke file
                     $this->saveToJsonFile($filename, $items->toArray());
@@ -131,9 +132,9 @@ class CleanupActivityLogs extends Command
     private function saveToJsonFile($filename, $data)
     {
         // Periksa apakah file sudah ada
-        if (Storage::exists($filename)) {
+        if (file_exists($filename)) {
             // Baca file yang sudah ada
-            $currentData = json_decode(Storage::get($filename), true);
+            $currentData = json_decode(file_get_contents($filename), true);
             if (!is_array($currentData)) {
                 $currentData = [];
             }
@@ -142,16 +143,16 @@ class CleanupActivityLogs extends Command
             $currentData = array_merge($currentData, $data);
             
             // Simpan kembali file
-            Storage::put($filename, json_encode($currentData, JSON_PRETTY_PRINT));
+            file_put_contents($filename, json_encode($currentData, JSON_PRETTY_PRINT));
         } else {
             // Buat direktori jika belum ada
             $directory = dirname($filename);
-            if (!Storage::exists($directory)) {
-                Storage::makeDirectory($directory, 0755, true);
+            if (!file_exists($directory)) {
+                mkdir($directory, 0755, true);
             }
             
             // Simpan data ke file baru
-            Storage::put($filename, json_encode($data, JSON_PRETTY_PRINT));
+            file_put_contents($filename, json_encode($data, JSON_PRETTY_PRINT));
         }
     }
     
@@ -188,22 +189,22 @@ class CleanupActivityLogs extends Command
     {
         $this->info("Menghapus file JSON lama...");
         
-        // Cari semua direktori tanggal dalam logs/activities
-        $directories = Storage::directories('logs/activities');
+        // Cari semua file JSON dalam direktori logs/activities
+        $files = glob(base_path('public') . '/logs/activities/*.json');
         
         $deletedCount = 0;
         
-        foreach ($directories as $directory) {
-            $date = basename($directory);
-            $directoryDate = Carbon::createFromFormat('Y-m-d', $date);
+        foreach ($files as $file) {
+            $date = pathinfo($file, PATHINFO_FILENAME);
+            $fileDate = Carbon::createFromFormat('Y-m-d', $date);
             
-            // Hapus direktori jika lebih lama dari cutoff date
-            if ($directoryDate->lt($cutoffDate)) {
-                Storage::deleteDirectory($directory);
+            // Hapus file jika lebih lama dari cutoff date
+            if ($fileDate->lt($cutoffDate)) {
+                unlink($file);
                 $deletedCount++;
             }
         }
         
-        $this->info("Berhasil menghapus {$deletedCount} direktori log");
+        $this->info("Berhasil menghapus {$deletedCount} file log");
     }
 } 

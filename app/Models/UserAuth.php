@@ -17,7 +17,6 @@ class UserAuth extends Model implements AuthenticatableContract, AuthorizableCon
     protected $table = 'users';
 
     protected $fillable = [
-        'id',
         'email',
         'password', 
         'role',
@@ -49,6 +48,9 @@ class UserAuth extends Model implements AuthenticatableContract, AuthorizableCon
         'updated_at',
         'deleted_at',
     ];
+    
+    public $incrementing = false;
+    protected $keyType = 'string';
     
     public static function boot()
     {

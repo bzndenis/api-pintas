@@ -47,6 +47,7 @@ $router->group(['prefix' => 'activity', 'middleware' => 'login'], function () us
     $router->get('/logs', 'UserActivityController@getActivityLogs');
     $router->get('/dates', 'UserActivityController@getActivityLogDates');
     $router->get('/statistics', 'UserActivityController@getActivityStatistics');
+    $router->get('/usage-time', 'UserActivityController@getUsageTime');
 });
 
 // Sekolah Routes

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use App\Http\Helper\ResponseBuilder;
 use Ramsey\Uuid\Uuid;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -204,45 +205,77 @@ class AuthController extends Controller
             return ResponseBuilder::error(401, "Token tidak tersedia", null);
         }
         
-        $user = UserAuth::where('remember_token', $token)->first();
+        // Hapus 'Bearer ' dari token jika ada
+        if (strpos($token, 'Bearer ') === 0) {
+            $token = substr($token, 7);
+        }
+        
+        // Debug token
+        \Log::info('Token yang digunakan: ' . $token);
+        
+        // Gunakan with() untuk memastikan data sekolah tersedia
+        $user = UserAuth::where('remember_token', $token)
+            ->where('is_active', true)
+            ->first();
         
         if (!$user) {
             return ResponseBuilder::error(404, "User tidak ditemukan atau token tidak valid", null);
         }
         
-        $user->update([
-            'remember_token' => null
-        ]);
+        // Debug user
+        \Log::info('User ditemukan:', ['id' => $user->id, 'email' => $user->email]);
         
-        // Catat aktivitas logout di tabel user_sessions
         try {
+            DB::beginTransaction();
+            
+            // Pastikan user_id valid
+            if (!$user->id) {
+                throw new \Exception('User ID tidak valid');
+            }
+            
+            // Update user
+            $user->remember_token = null;
+            $user->save();
+            
             // Update status sesi menjadi expired
-            \DB::table('user_sessions')
+            DB::table('user_sessions')
                 ->where('user_id', $user->id)
                 ->where('status', 'active')
                 ->update([
                     'status' => 'expired',
-                    'last_activity' => \Carbon\Carbon::now(),
-                    'duration' => \DB::raw('TIMESTAMPDIFF(SECOND, login_time, NOW())'),
-                    'updated_at' => \Carbon\Carbon::now()
+                    'last_activity' => Carbon::now(),
+                    'duration' => DB::raw('TIMESTAMPDIFF(SECOND, login_time, NOW())'),
+                    'updated_at' => Carbon::now()
                 ]);
                 
-            // Catat aktivitas logout di tabel user_activities
-            \DB::table('user_activities')->insert([
+            // Catat aktivitas logout dengan user_id yang valid
+            $activityData = [
                 'id' => Uuid::uuid4()->toString(),
                 'user_id' => $user->id,
                 'action' => 'logout',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->header('User-Agent'),
                 'sekolah_id' => $user->sekolah_id,
-                'created_at' => \Carbon\Carbon::now(),
-                'updated_at' => \Carbon\Carbon::now()
-            ]);
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ];
+            
+            // Debug activity data
+            \Log::info('Activity data yang akan disimpan:', $activityData);
+            
+            DB::table('user_activities')->insert($activityData);
+            
+            DB::commit();
+            return ResponseBuilder::success(200, "Logout berhasil", null);
+            
         } catch (\Exception $e) {
-            \Log::error('Gagal mencatat aktivitas logout: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Gagal melakukan logout: ' . $e->getMessage());
+            \Log::error('User ID: ' . ($user->id ?? 'null'));
+            \Log::error('Sekolah ID: ' . ($user->sekolah_id ?? 'null'));
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal melakukan logout: " . $e->getMessage());
         }
-        
-        return ResponseBuilder::success(200, "Logout berhasil", null);
     }
     
     private function generateRandomString($length = 80)
