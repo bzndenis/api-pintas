@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Helper\ResponseBuilder;
 use Ramsey\Uuid\Uuid;
 use Carbon\Carbon;
+use App\Models\UserSession;
 
 class AuthController extends Controller
 {
@@ -106,38 +107,31 @@ class AuthController extends Controller
         $email = $request->input("email");
         $password = $request->input("password");
 
-        // Ambil user dengan relasi sekolah dan guru yang benar
-        $user = UserAuth::with([
-            'sekolah',
-            'guru'
-        ])
-        ->where('email', $email)
-        ->first();
+        try {
+            DB::beginTransaction();
+            
+            // Ambil user dengan relasi sekolah dan guru
+            $user = UserAuth::with(['sekolah', 'guru'])
+                ->where('email', $email)
+                ->where('is_active', true)
+                ->first();
 
-        if (!$user) {
-            return ResponseBuilder::error(401, "Login Gagal", ["token" => null]);
-        }
+            if (!$user) {
+                return ResponseBuilder::error(401, "Login Gagal", ["token" => null]);
+            }
 
-        if (!$user->is_active) {
-            return ResponseBuilder::error(401, "Akun tidak aktif", ["token" => null]);
-        }
-
-        if (Hash::check($password, $user->password)) {
-            try {
-                DB::beginTransaction();
-                
-                $newToken = $this->generateRandomString();
+            if (Hash::check($password, $user->password)) {
                 $loginTime = Carbon::now();
+                $newToken = $this->generateRandomString();
 
                 // Update user dengan last_login dan token baru
                 $user->update([
                     'last_login' => $loginTime,
                     'remember_token' => $newToken
                 ]);
-                
+
                 // Nonaktifkan sesi sebelumnya jika ada
-                DB::table('user_sessions')
-                    ->where('user_id', $user->id)
+                UserSession::where('user_id', $user->id)
                     ->where('status', 'active')
                     ->update([
                         'status' => 'expired',
@@ -147,19 +141,16 @@ class AuthController extends Controller
                     ]);
 
                 // Catat sesi login baru
-                DB::table('user_sessions')->insert([
-                    'id' => Uuid::uuid4()->toString(),
+                UserSession::create([
                     'user_id' => $user->id,
                     'login_time' => $loginTime,
                     'last_activity' => $loginTime,
                     'status' => 'active',
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->header('User-Agent'),
-                    'sekolah_id' => $user->sekolah_id,
-                    'created_at' => $loginTime,
-                    'updated_at' => $loginTime
+                    'sekolah_id' => $user->sekolah_id
                 ]);
-                
+
                 // Catat aktivitas login
                 DB::table('user_activities')->insert([
                     'id' => Uuid::uuid4()->toString(),
@@ -205,13 +196,15 @@ class AuthController extends Controller
                     "user" => $userData
                 ]);
 
-            } catch (\Exception $e) {
-                DB::rollBack();
-                \Log::error('Gagal melakukan login: ' . $e->getMessage());
-                return ResponseBuilder::error(500, "Gagal melakukan login: " . $e->getMessage());
+            } else {
+                return ResponseBuilder::error(401, "Password tidak valid", ["token" => null]);
             }
-        } else {
-            return ResponseBuilder::error(401, "Login Gagal", ["token" => null]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Gagal melakukan login: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal melakukan login: " . $e->getMessage());
         }
     }
     

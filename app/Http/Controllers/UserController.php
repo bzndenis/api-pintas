@@ -6,10 +6,13 @@ use App\Models\User;
 use App\Models\UserAuth;
 use App\Models\Guru;
 use App\Models\Sekolah;
+use App\Models\UserSession;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Ramsey\Uuid\Uuid;
 
 class UserController extends Controller
 {
@@ -20,24 +23,61 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        $role = $request->query('role');
-        $sekolahId = $request->query('sekolah_id');
-        
-        $query = User::with('sekolah');
-        
-        // Filter berdasarkan role jika ada
-        if ($role) {
-            $query->where('role', $role);
+        try {
+            $role = $request->query('role');
+            $sekolahId = $request->sekolah_id; // Menggunakan sekolah_id dari middleware
+            
+            $query = UserAuth::with(['sekolah', 'guru']);
+            
+            // Filter berdasarkan role
+            if ($role) {
+                $query->where('role', $role);
+            }
+            
+            // Filter berdasarkan sekolah
+            if ($sekolahId) {
+                $query->where('sekolah_id', $sekolahId);
+            }
+            
+            // Ubah get() menjadi paginate() untuk mendapatkan collection yang bisa dihitung
+            $users = $query->orderBy('created_at', 'desc')->get();
+            
+            // Format response data
+            $formattedData = [
+                'total' => $users->count(),
+                'users' => $users->map(function($user) {
+                    return [
+                        'id' => $user->id,
+                        'email' => $user->email,
+                        'nama_lengkap' => $user->nama_lengkap,
+                        'role' => $user->role,
+                        'no_telepon' => $user->no_telepon,
+                        'last_login' => $user->last_login,
+                        'is_active' => $user->is_active,
+                        'created_at' => $user->created_at,
+                        'sekolah' => $user->sekolah ? [
+                            'id' => $user->sekolah->id,
+                            'nama_sekolah' => $user->sekolah->nama_sekolah,
+                            'npsn' => $user->sekolah->npsn,
+                            'alamat' => $user->sekolah->alamat
+                        ] : null,
+                        'guru' => $user->guru ? [
+                            'id' => $user->guru->id,
+                            'nama' => $user->guru->nama,
+                            'nip' => $user->guru->nip,
+                            'email' => $user->guru->email,
+                            'no_telp' => $user->guru->no_telp
+                        ] : null
+                    ];
+                })
+            ];
+            
+            return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $formattedData);
+        } catch (\Exception $e) {
+            \Log::error('Gagal mengambil data user: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        // Filter berdasarkan sekolah jika ada
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
-        }
-        
-        $data = $query->orderBy('created_at', 'desc')->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $data, true, false);
     }
 
     public function store(Request $request)
@@ -230,74 +270,125 @@ class UserController extends Controller
 
     public function changePassword(Request $request)
     {
-        $this->validate($request, [
-            'email' => 'required',
-            'password' => 'required|min:6',
-            'new_password' => 'required|min:6',
-        ]);
-
-        $email = $request->input("email");
-        $password = $request->input("password");
-        $newPassword = $request->input("new_password");
-
-        $user = User::where('email', $email)->first();
-
-        if (!$user) {
-            $out = [
-                "message" => "User tidak ditemukan",
-                "code" => 404,
-            ];
-            return response()->json($out, $out['code']);
-        }
-
-        if (Hash::check($password, $user->password)) {
-            $hashNewPwd = Hash::make($newPassword);
-
-            $user->update([
-                'password' => $hashNewPwd,
+        try {
+            $this->validate($request, [
+                'password_lama' => 'required',
+                'password_baru' => 'required|min:6',
+                'konfirmasi_password' => 'required|same:password_baru'
             ]);
 
-            $out = [
-                "message" => "Password berhasil diperbarui",
-                "code" => 200,
-            ];
-        } else {
-            $out = [
-                "message" => "Password lama salah",
-                "code" => 401,
-            ];
-        }
+            $userId = $request->user_id; // Dari middleware
+            $user = UserAuth::find($userId);
 
-        return response()->json($out, $out['code']);
+            if (!$user) {
+                return ResponseBuilder::error(404, "User tidak ditemukan");
+            }
+
+            if (!Hash::check($request->password_lama, $user->password)) {
+                return ResponseBuilder::error(401, "Password lama tidak sesuai");
+            }
+
+            DB::beginTransaction();
+            
+            // Update password
+            $user->update([
+                'password' => Hash::make($request->password_baru)
+            ]);
+
+            // Catat aktivitas
+            DB::table('user_activities')->insert([
+                'id' => Uuid::uuid4()->toString(),
+                'user_id' => $user->id,
+                'action' => 'change_password',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+                'sekolah_id' => $user->sekolah_id,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
+
+            DB::commit();
+            return ResponseBuilder::success(200, "Password berhasil diubah");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Gagal mengubah password: ' . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengubah password: " . $e->getMessage());
+        }
     }
     
     public function getUserProfile(Request $request)
     {
-        $token = $request->header('Authorization');
-        
-        if (!$token) {
-            return response()->json([
-                'message' => 'Token tidak tersedia',
-                'code' => 401,
-            ], 401);
+        try {
+            $token = $request->header('Authorization');
+            
+            if (!$token) {
+                return ResponseBuilder::error(401, "Token tidak tersedia", null);
+            }
+            
+            // Hapus 'Bearer ' dari token jika ada
+            if (strpos($token, 'Bearer ') === 0) {
+                $token = substr($token, 7);
+            }
+            
+            $user = UserAuth::with(['sekolah', 'guru'])
+                ->where('remember_token', $token)
+                ->where('is_active', true)
+                ->first();
+            
+            if (!$user) {
+                return ResponseBuilder::error(404, "User tidak ditemukan atau token tidak valid", null);
+            }
+
+            // Format response data
+            $userData = [
+                'id' => $user->id,
+                'email' => $user->email,
+                'nama_lengkap' => $user->nama_lengkap,
+                'role' => $user->role,
+                'no_telepon' => $user->no_telepon,
+                'last_login' => $user->last_login,
+                'is_active' => $user->is_active,
+                'sekolah' => $user->sekolah ? [
+                    'id' => $user->sekolah->id,
+                    'nama_sekolah' => $user->sekolah->nama_sekolah,
+                    'npsn' => $user->sekolah->npsn,
+                    'alamat' => $user->sekolah->alamat
+                ] : null,
+                'guru' => $user->guru ? [
+                    'id' => $user->guru->id,
+                    'nama' => $user->guru->nama,
+                    'nip' => $user->guru->nip,
+                    'email' => $user->guru->email,
+                    'no_telp' => $user->guru->no_telp
+                ] : null
+            ];
+
+            // Update last activity di user session
+            UserSession::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->update([
+                    'last_activity' => Carbon::now(),
+                    'duration' => DB::raw('TIMESTAMPDIFF(SECOND, login_time, NOW())')
+                ]);
+            
+            // Catat aktivitas
+            DB::table('user_activities')->insert([
+                'id' => Uuid::uuid4()->toString(),
+                'user_id' => $user->id,
+                'action' => 'view_profile',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+                'sekolah_id' => $user->sekolah_id,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
+            
+            return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $userData);
+            
+        } catch (\Exception $e) {
+            \Log::error('Gagal mengambil profile user: ' . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengambil profile: " . $e->getMessage());
         }
-        
-        $user = User::with(['sekolah', 'guru'])
-            ->where('remember_token', $token)
-            ->where('is_active', true)
-            ->first();
-        
-        if (!$user) {
-            return response()->json([
-                'message' => 'User tidak ditemukan atau token tidak valid',
-                'code' => 404,
-            ], 404);
-        }
-        
-        return response()->json([
-            'message' => 'Berhasil Mendapatkan Data',
-            'code' => 200,
-            'data' => $user,
-        ], 200);
     }
 }

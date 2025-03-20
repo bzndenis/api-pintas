@@ -52,5 +52,311 @@
         "ip_address": "::1",
         "user_agent": "PostmanRuntime\/7.43.2",
         "timestamp": "2025-03-20T21:34:41+00:00"
+    },
+    {
+        "id": "ed183683-691f-46e8-9fff-7a443631003b",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:28+00:00"
+    },
+    {
+        "id": "8e711a9f-96a3-4b7c-aef7-6d119c7be42b",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:28+00:00"
+    },
+    {
+        "id": "d02c3549-1a10-4001-ae40-805b55a33a37",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:31+00:00"
+    },
+    {
+        "id": "925d9566-c642-4723-a54d-c984b2156896",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:32+00:00"
+    },
+    {
+        "id": "f1f3bb0b-d88d-4cf6-9881-3d4637652047",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:46+00:00"
+    },
+    {
+        "id": "91626551-3617-4090-99a9-d87b8b133d08",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:35:46+00:00"
+    },
+    {
+        "id": "dc90813e-49c6-43bc-853a-a8c7b4a05535",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:38:07+00:00"
+    },
+    {
+        "id": "c34c7ae3-6f4c-4c03-b243-b3becb5401ac",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:38:07+00:00"
+    },
+    {
+        "id": "820ed986-c38c-4d85-9bc9-3d88bafdbcfd",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:38:23+00:00"
+    },
+    {
+        "id": "92341f05-7270-47e1-a0b8-9a5717964599",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:38:23+00:00"
+    },
+    {
+        "id": "d36b5024-22ae-41bb-a2c1-3045f92dfeaa",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:39:40+00:00"
+    },
+    {
+        "id": "a35dbf5f-419d-4bc0-864f-495421354642",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:39:40+00:00"
+    },
+    {
+        "id": "ffc8fa21-1eeb-4586-befd-9173b83590ae",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:40:38+00:00"
+    },
+    {
+        "id": "5bbd7aa0-80dd-4f3d-95d5-917ed960472c",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/profile",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:40:39+00:00"
+    },
+    {
+        "id": "6a1d48f1-448d-4f03-a49b-82739fde49be",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/pagination",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:40:59+00:00"
+    },
+    {
+        "id": "e6c7c598-06e9-4c36-8236-1b0202699cda",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/pagination",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:40:59+00:00"
+    },
+    {
+        "id": "ea8eb28d-985f-48a5-872d-6f70747d906e",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/1",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:33+00:00"
+    },
+    {
+        "id": "6309f7ee-37b8-4004-b8ce-05021519710c",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/1",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:33+00:00"
+    },
+    {
+        "id": "150b6b5c-492b-4b48-abd4-91d4b7906052",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:49+00:00"
+    },
+    {
+        "id": "f13093a4-0d99-4eb3-9179-cbecc5e9d456",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:49+00:00"
+    },
+    {
+        "id": "b3873490-e211-4675-9045-b05a4a6ba05a",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:54+00:00"
+    },
+    {
+        "id": "aa391ea8-0f64-4b30-818a-34825ef91b32",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:54+00:00"
+    },
+    {
+        "id": "85c495d6-0b9e-41a4-8630-6ccbdbfa234f",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:57+00:00"
+    },
+    {
+        "id": "642cd40b-ab8b-4354-bd86-91406d582ded",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:41:57+00:00"
+    },
+    {
+        "id": "6c430745-167c-44e1-9c7c-bb183a1f8842",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:13+00:00"
+    },
+    {
+        "id": "43040da7-d145-48e7-b610-8af50d6f8e5d",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user\/dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:13+00:00"
+    },
+    {
+        "id": "94e1ef8d-dc6d-4de6-90de-8979f8799814",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:17+00:00"
+    },
+    {
+        "id": "e18e8363-a6b4-4802-94cc-50a00b1012c5",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:user",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:17+00:00"
+    },
+    {
+        "id": "ece3ed36-bd9b-4ecb-8e39-bfe5ecc73bfc",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/sessions",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:48+00:00"
+    },
+    {
+        "id": "1518d321-4501-4ef3-be09-5c3aed8720f5",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/logs",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:42:59+00:00"
+    },
+    {
+        "id": "98880700-8f96-4899-b3e0-a2b2a350effc",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/dates",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:43:12+00:00"
+    },
+    {
+        "id": "044ecd60-0f08-4571-bf6a-310571c70b53",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/statistics",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:43:22+00:00"
+    },
+    {
+        "id": "d92ee10a-e812-406c-8fee-08f1a80d0185",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:43:49+00:00"
+    },
+    {
+        "id": "997f3606-a9a2-45d1-af9d-7fea8b09b720",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:44:03+00:00"
     }
 ]

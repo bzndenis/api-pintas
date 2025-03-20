@@ -10,7 +10,6 @@ class UserSession extends Model
     protected $table = 'user_sessions';
     
     protected $fillable = [
-        'id',
         'user_id',
         'login_time',
         'last_activity',
@@ -19,23 +18,20 @@ class UserSession extends Model
         'ip_address',
         'user_agent',
         'sekolah_id',
+        'created_at',
+        'updated_at'
     ];
     
     protected $casts = [
         'duration' => 'integer',
         'login_time' => 'datetime',
         'last_activity' => 'datetime',
-        'status' => 'string',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
     
-    protected $dates = [
-        'login_time',
-        'last_activity',
-        'created_at',
-        'updated_at',
-    ];
+    public $incrementing = false;
+    protected $keyType = 'string';
     
     public static function boot()
     {
@@ -51,7 +47,7 @@ class UserSession extends Model
     
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(UserAuth::class, 'user_id');
     }
     
     public function sekolah()
