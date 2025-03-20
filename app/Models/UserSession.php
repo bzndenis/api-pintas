@@ -22,9 +22,9 @@ class UserSession extends Model
     ];
     
     protected $casts = [
+        'duration' => 'integer',
         'login_time' => 'datetime',
         'last_activity' => 'datetime',
-        'duration' => 'integer',
         'status' => 'string',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

@@ -1,0 +1,56 @@
+[
+    {
+        "id": "5d396f2d-cc3c-4a53-8c14-2da2992c82ff",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:22+00:00"
+    },
+    {
+        "id": "509db7bc-83dc-4782-b15d-ace7aab18234",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:27+00:00"
+    },
+    {
+        "id": "3aab8afb-8b92-4353-b8cd-cfb4a1af6a9d",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:29+00:00"
+    },
+    {
+        "id": "a7d5b787-2a5b-4491-9263-a3706aac8619",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:34+00:00"
+    },
+    {
+        "id": "3eb63443-0352-4792-937e-b122f5542a16",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:39+00:00"
+    },
+    {
+        "id": "c5a960fa-0876-4266-8647-c8f5336642bd",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:activity\/usage-time",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T21:34:41+00:00"
+    }
+]

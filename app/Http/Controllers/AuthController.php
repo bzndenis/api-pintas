@@ -99,8 +99,8 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $this->validate($request, [
-            'email' => 'required',
-            'password' => 'required|min:6'
+            "email" => "required|email",
+            "password" => "required"
         ]);
 
         $email = $request->input("email");
@@ -109,7 +109,7 @@ class AuthController extends Controller
         // Ambil user dengan relasi sekolah dan guru yang benar
         $user = UserAuth::with([
             'sekolah',
-            'guru' // Gunakan relasi normal tanpa kondisi tambahan
+            'guru'
         ])
         ->where('email', $email)
         ->first();
@@ -123,75 +123,93 @@ class AuthController extends Controller
         }
 
         if (Hash::check($password, $user->password)) {
-            $newToken = $this->generateRandomString();
-
-            $user->update([
-                'last_login' => \Carbon\Carbon::now(),
-                'remember_token' => $newToken
-            ]);
-            
-            // Catat sesi login di tabel user_sessions
             try {
-                \DB::table('user_sessions')->insert([
+                DB::beginTransaction();
+                
+                $newToken = $this->generateRandomString();
+                $loginTime = Carbon::now();
+
+                // Update user dengan last_login dan token baru
+                $user->update([
+                    'last_login' => $loginTime,
+                    'remember_token' => $newToken
+                ]);
+                
+                // Nonaktifkan sesi sebelumnya jika ada
+                DB::table('user_sessions')
+                    ->where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->update([
+                        'status' => 'expired',
+                        'last_activity' => $loginTime,
+                        'duration' => DB::raw('TIMESTAMPDIFF(SECOND, login_time, NOW())'),
+                        'updated_at' => $loginTime
+                    ]);
+
+                // Catat sesi login baru
+                DB::table('user_sessions')->insert([
                     'id' => Uuid::uuid4()->toString(),
                     'user_id' => $user->id,
-                    'login_time' => \Carbon\Carbon::now(),
-                    'last_activity' => \Carbon\Carbon::now(),
+                    'login_time' => $loginTime,
+                    'last_activity' => $loginTime,
                     'status' => 'active',
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->header('User-Agent'),
                     'sekolah_id' => $user->sekolah_id,
-                    'created_at' => \Carbon\Carbon::now(),
-                    'updated_at' => \Carbon\Carbon::now()
+                    'created_at' => $loginTime,
+                    'updated_at' => $loginTime
                 ]);
                 
-                // Catat aktivitas login di tabel user_activities
-                \DB::table('user_activities')->insert([
+                // Catat aktivitas login
+                DB::table('user_activities')->insert([
                     'id' => Uuid::uuid4()->toString(),
                     'user_id' => $user->id,
                     'action' => 'login',
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->header('User-Agent'),
                     'sekolah_id' => $user->sekolah_id,
-                    'created_at' => \Carbon\Carbon::now(),
-                    'updated_at' => \Carbon\Carbon::now()
+                    'created_at' => $loginTime,
+                    'updated_at' => $loginTime
                 ]);
-            } catch (\Exception $e) {
-                \Log::error('Gagal mencatat sesi login: ' . $e->getMessage());
-            }
 
-            $userData = [
-                'id' => $user->id,
-                'email' => $user->email,
-                'nama_lengkap' => $user->nama_lengkap,
-                'role' => $user->role,
-                'sekolah_id' => $user->sekolah_id,
-                'no_telepon' => $user->no_telepon,
-                'alamat_sekolah' => $user->alamat_sekolah,
-                'last_login' => $user->last_login,
-                'sekolah' => $user->sekolah ? [
-                    'id' => $user->sekolah->id,
-                    'nama_sekolah' => $user->sekolah->nama_sekolah,
-                    'npsn' => $user->sekolah->npsn,
-                    'alamat' => $user->sekolah->alamat
-                ] : null
-            ];
-
-            if ($user->role === 'guru' && $user->guru) {
-                $userData['guru'] = [
-                    'id' => $user->guru->id,
-                    'nama' => $user->guru->nama,
-                    'nip' => $user->guru->nip,
-                    'email' => $user->guru->email,
-                    'no_telp' => $user->guru->no_telp
+                $userData = [
+                    'id' => $user->id,
+                    'email' => $user->email,
+                    'nama_lengkap' => $user->nama_lengkap,
+                    'role' => $user->role,
+                    'sekolah_id' => $user->sekolah_id,
+                    'no_telepon' => $user->no_telepon,
+                    'alamat_sekolah' => $user->alamat_sekolah,
+                    'last_login' => $user->last_login,
+                    'sekolah' => $user->sekolah ? [
+                        'id' => $user->sekolah->id,
+                        'nama_sekolah' => $user->sekolah->nama_sekolah,
+                        'npsn' => $user->sekolah->npsn,
+                        'alamat' => $user->sekolah->alamat
+                    ] : null
                 ];
+
+                if ($user->role === 'guru' && $user->guru) {
+                    $userData['guru'] = [
+                        'id' => $user->guru->id,
+                        'nama' => $user->guru->nama,
+                        'nip' => $user->guru->nip,
+                        'email' => $user->guru->email,
+                        'no_telp' => $user->guru->no_telp
+                    ];
+                }
+
+                DB::commit();
+                return ResponseBuilder::success(200, "Login Berhasil", [
+                    "token" => $newToken,
+                    "user" => $userData
+                ]);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                \Log::error('Gagal melakukan login: ' . $e->getMessage());
+                return ResponseBuilder::error(500, "Gagal melakukan login: " . $e->getMessage());
             }
-
-            return ResponseBuilder::success(200, "Login Berhasil", [
-                "token" => $newToken,
-                "user" => $userData
-            ]);
-
         } else {
             return ResponseBuilder::error(401, "Login Gagal", ["token" => null]);
         }
