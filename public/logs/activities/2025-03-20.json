@@ -358,5 +358,32 @@
         "ip_address": "::1",
         "user_agent": "PostmanRuntime\/7.43.2",
         "timestamp": "2025-03-20T21:44:03+00:00"
+    },
+    {
+        "id": "e47d5cee-1049-4b01-8110-c0dc2ad7fadb",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:admin\/guru",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T22:15:38+00:00"
+    },
+    {
+        "id": "b3741bf2-9769-4e32-861d-0f2353b08d4d",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:admin\/guru",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T22:16:55+00:00"
+    },
+    {
+        "id": "d09a9e56-7cc7-49b0-9fec-30b8244686e7",
+        "user_id": "dd7786f5-31ae-4416-8da9-ae13c533a6b7",
+        "sekolah_id": "1f997e2a-38ee-449e-80aa-0ea09f22a4a7",
+        "action": "GET:admin\/guru",
+        "ip_address": "::1",
+        "user_agent": "PostmanRuntime\/7.43.2",
+        "timestamp": "2025-03-20T22:17:18+00:00"
     }
 ]

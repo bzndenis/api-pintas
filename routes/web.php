@@ -57,6 +57,10 @@ $router->group(['prefix' => 'sekolah', 'middleware' => 'login'], function () use
     $router->get('/{id}', 'SekolahController@show');
     $router->put('/{id}', 'SekolahController@update');
     $router->delete('/{id}', 'SekolahController@destroy');
+    $router->get('/statistics/summary', 'SekolahController@getStatistics');
+    $router->get('/{id}/guru', 'SekolahController@getGuru');
+    $router->get('/{id}/siswa', 'SekolahController@getSiswa');
+    $router->get('/{id}/kelas', 'SekolahController@getKelas');
 });
 
 // Guru Routes
@@ -66,6 +70,10 @@ $router->group(['prefix' => 'guru', 'middleware' => 'login'], function () use ($
     $router->get('/{id}', 'GuruController@show');
     $router->put('/{id}', 'GuruController@update');
     $router->delete('/{id}', 'GuruController@destroy');
+    $router->get('/{id}/jadwal', 'GuruController@getJadwal');
+    $router->get('/{id}/kelas', 'GuruController@getKelas');
+    $router->get('/{id}/mapel', 'GuruController@getMapel');
+    $router->post('/import', 'GuruController@import');
 });
 
 // Tahun Ajaran Routes
@@ -86,6 +94,10 @@ $router->group(['prefix' => 'kelas', 'middleware' => 'login'], function () use (
     $router->put('/{id}', 'KelasController@update');
     $router->delete('/{id}', 'KelasController@destroy');
     $router->get('/{id}/siswa', 'KelasController@getSiswa');
+    $router->get('/{id}/jadwal', 'KelasController@getJadwal');
+    $router->get('/{id}/nilai', 'KelasController@getNilai');
+    $router->get('/{id}/absensi', 'KelasController@getAbsensi');
+    $router->get('/{id}/guru', 'KelasController@getGuru');
 });
 
 // Siswa Routes
@@ -148,66 +160,90 @@ $router->group(['prefix' => 'pertemuan', 'middleware' => 'login'], function () u
     $router->get('/{id}', 'PertemuanBulananController@show');
     $router->put('/{id}', 'PertemuanBulananController@update');
     $router->delete('/{id}', 'PertemuanBulananController@destroy');
+    
+    // New routes
+    $router->get('/kelas/{kelasId}', 'PertemuanBulananController@getByKelas');
+    $router->get('/bulan/{bulan}', 'PertemuanBulananController@getByBulan');
+    $router->get('/tahun/{tahun}', 'PertemuanBulananController@getByTahun');
 });
 
 // Absensi Siswa Routes
 $router->group(['prefix' => 'absensi', 'middleware' => 'login'], function () use ($router) {
+    // Pindahkan rute statis ke atas
+    $router->get('/rekap', 'AbsensiSiswaController@getRekapAbsensi');
+    $router->get('/report/siswa/{siswaId}', 'AbsensiSiswaController@reportBySiswa');
+    $router->get('/report/kelas/{kelasId}', 'AbsensiSiswaController@reportByKelas');
+    
+    // Kemudian rute CRUD dasar
     $router->get('/', 'AbsensiSiswaController@index');
     $router->post('/', 'AbsensiSiswaController@store');
+    $router->post('/import', 'AbsensiSiswaController@import');
+    
+    // Rute dengan parameter di akhir
     $router->get('/{id}', 'AbsensiSiswaController@show');
     $router->put('/{id}', 'AbsensiSiswaController@update');
     $router->delete('/{id}', 'AbsensiSiswaController@destroy');
-    $router->post('/import', 'AbsensiSiswaController@import');
-    $router->get('/report/siswa/{siswaId}', 'AbsensiSiswaController@reportBySiswa');
-    $router->get('/report/kelas/{kelasId}', 'AbsensiSiswaController@reportByKelas');
-});
-
-// Setting Routes
-$router->group(['prefix' => 'settings', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'SettingController@index');
-    $router->post('/', 'SettingController@store');
-    $router->get('/{id}', 'SettingController@show');
-    $router->put('/{id}', 'SettingController@update');
-    $router->delete('/{id}', 'SettingController@destroy');
-    $router->post('/get-by-key', 'SettingController@getByKey');
-    $router->post('/get-by-group', 'SettingController@getByGroup');
-    $router->post('/bulk-update', 'SettingController@bulkUpdate');
 });
 
 // API Mobile - Guru Routes
 $router->group(['prefix' => 'api/guru', 'middleware' => 'login'], function () use ($router) {
+    // Profile dan Data Dasar
     $router->get('/profile', 'API\GuruController@getProfile');
+    $router->put('/profile', 'API\GuruController@updateProfile');
+    
+    // Kelas dan Siswa
     $router->get('/kelas', 'API\GuruController@getKelas');
     $router->get('/kelas/{id}/siswa', 'API\GuruController@getSiswaByKelas');
+    $router->get('/kelas/{id}/jadwal', 'API\GuruController@getJadwalKelas');
+    
+    // Mata Pelajaran dan Pembelajaran
     $router->get('/mapel', 'API\GuruController@getMapel');
+    $router->get('/mapel/{id}/materi', 'API\GuruController@getMateri');
     $router->get('/cp/{mapelId}', 'API\GuruController@getCapaianPembelajaran');
     $router->get('/tp/{cpId}', 'API\GuruController@getTujuanPembelajaran');
+    
+    // Penilaian
+    $router->post('/nilai/batch', 'API\GuruController@storeNilaiBatch');
     $router->post('/nilai', 'API\GuruController@storeNilai');
+    $router->put('/nilai/{id}', 'API\GuruController@updateNilai');
+    
+    // Pertemuan dan Absensi
     $router->post('/pertemuan', 'API\GuruController@storePertemuan');
+    $router->put('/pertemuan/{id}', 'API\GuruController@updatePertemuan');
+    $router->post('/absensi/batch', 'API\GuruController@storeAbsensiBatch');
     $router->post('/absensi', 'API\GuruController@storeAbsensi');
+    
+    // Laporan
     $router->get('/report/nilai/{kelasId}', 'API\GuruController@reportNilaiKelas');
     $router->get('/report/absensi/{kelasId}', 'API\GuruController@reportAbsensiKelas');
+    $router->get('/report/pembelajaran/{kelasId}', 'API\GuruController@reportPembelajaran');
+    
+    // Dashboard
+    $router->get('/dashboard/summary', 'API\GuruController@getDashboardSummary');
+    $router->get('/dashboard/activities', 'API\GuruController@getRecentActivities');
 });
 
-// Public Routes
-// $router->group(['prefix' => 'open'], function () use ($router) {
-//     $router->get('/token', 'PublicController@tokenview');
-//     $router->get('/news', 'PublicController@index');
-//     $router->get('/news/{id}', 'PublicController@show');
-//     $router->get('/newspagenation', 'PublicController@pagenationNews');
-//     $router->get('/cctv', 'PublicController@getcctv');
-//     $router->get('/cctv/{id}', 'PublicController@showcctvbyid');
-//     $router->get('/polantas', 'PublicController@get_polantas');
-//     $router->get('/polantas/{id}', 'PublicController@get_polantasbyid');
-//     $router->get('/polantas_category', 'PublicController@get_polantascate');
-//     $router->get('/polantas_category/{id}', 'PublicController@get_polantascatebyid');
-//     $router->get('/fasum', 'PublicController@get_fasum');
-//     $router->get('/fasum/{id}', 'PublicController@get_fasumbyid');
-//     $router->get('/fasum_category', 'PublicController@get_fasumcate');
-//     $router->get('/fasum_category/{id}', 'PublicController@get_fasumcatebyid');
-//     $router->get('/trayek', 'PublicController@get_trayek');
-//     $router->get('/trayek/{id}', 'PublicController@get_trayekbyid');
-//     $router->get('/trayek_category', 'PublicController@get_trayekcate');
-//     $router->get('/trayek_category/{id}', 'PublicController@get_trayekcatebyid');
-//     $router->get('/count_pelayanan', 'PublicController@count_total_data');
+// Admin Routes untuk manajemen guru
+$router->group(['prefix' => 'admin/guru', 'middleware' => ['login', 'admin']], function () use ($router) {
+    $router->get('/', 'Admin\GuruController@index');
+    $router->post('/', 'Admin\GuruController@store');
+    $router->get('/{id}', 'Admin\GuruController@show');
+    $router->put('/{id}', 'Admin\GuruController@update');
+    $router->delete('/{id}', 'Admin\GuruController@destroy');
+    $router->post('/reset-password/{id}', 'Admin\GuruController@resetPassword');
+    $router->post('/activate/{id}', 'Admin\GuruController@activate');
+    $router->post('/deactivate/{id}', 'Admin\GuruController@deactivate');
+});
+
+
+// Setting Routes
+// $router->group(['prefix' => 'settings', 'middleware' => 'login'], function () use ($router) {
+//     $router->get('/', 'SettingController@index');
+//     $router->post('/', 'SettingController@store');
+//     $router->get('/{id}', 'SettingController@show');
+//     $router->put('/{id}', 'SettingController@update');
+//     $router->delete('/{id}', 'SettingController@destroy');
+//     $router->post('/get-by-key', 'SettingController@getByKey');
+//     $router->post('/get-by-group', 'SettingController@getByGroup');
+//     $router->post('/bulk-update', 'SettingController@bulkUpdate');
 // });

@@ -15,8 +15,9 @@ class UserActivity extends Model
         'action',
         'ip_address',
         'user_agent',
-        'duration',
         'sekolah_id',
+        'created_at',
+        'updated_at'
     ];
     
     protected $casts = [
@@ -41,7 +42,7 @@ class UserActivity extends Model
     
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(UserAuth::class, 'user_id');
     }
     
     public function sekolah()

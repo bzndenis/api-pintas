@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\NilaiSiswa;
 use App\Models\Siswa;
 use App\Models\Kelas;
+use App\Models\TujuanPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class NilaiSiswaController extends Controller
 {
@@ -19,27 +21,62 @@ class NilaiSiswaController extends Controller
 
     public function index(Request $request)
     {
-        $siswaId = $request->query('siswa_id');
-        $tpId = $request->query('tp_id');
-        $sekolahId = $request->query('sekolah_id');
-        
-        $query = NilaiSiswa::with(['siswa', 'tujuanPembelajaran.capaianPembelajaran.mataPelajaran', 'createdBy', 'sekolah']);
-        
-        if ($siswaId) {
-            $query->where('siswa_id', $siswaId);
+        try {
+            $query = NilaiSiswa::with([
+                'siswa.kelas',
+                'tujuanPembelajaran.capaianPembelajaran.mataPelajaran',
+                'createdBy'
+            ]);
+            
+            if ($request->siswa_id) {
+                $query->where('siswa_id', $request->siswa_id);
+            }
+
+            if ($request->tp_id) {
+                $query->where('tp_id', $request->tp_id);
+            }
+
+            if ($request->sekolah_id) {
+                $query->where('sekolah_id', $request->sekolah_id);
+            }
+
+            $nilai = $query->orderBy('created_at', 'desc')->get();
+
+            $formattedData = [
+                'total' => $nilai->count(),
+                'nilai_siswa' => $nilai->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'nilai' => $item->nilai,
+                        'siswa' => [
+                            'id' => $item->siswa->id,
+                            'nama' => $item->siswa->nama,
+                            'kelas' => [
+                                'id' => $item->siswa->kelas->id,
+                                'nama_kelas' => $item->siswa->kelas->nama_kelas
+                            ]
+                        ],
+                        'tujuan_pembelajaran' => [
+                            'id' => $item->tujuanPembelajaran->id,
+                            'kode_tp' => $item->tujuanPembelajaran->kode_tp,
+                            'mata_pelajaran' => [
+                                'id' => $item->tujuanPembelajaran->capaianPembelajaran->mataPelajaran->id,
+                                'nama_mapel' => $item->tujuanPembelajaran->capaianPembelajaran->mataPelajaran->nama_mapel
+                            ]
+                        ],
+                        'created_by' => [
+                            'id' => $item->createdBy->id,
+                            'nama' => $item->createdBy->nama_lengkap
+                        ],
+                        'created_at' => $item->created_at->format('Y-m-d H:i:s')
+                    ];
+                })
+            ];
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        if ($tpId) {
-            $query->where('tp_id', $tpId);
-        }
-        
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
-        }
-        
-        $data = $query->orderBy('created_at', 'desc')->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $data, true, false);
     }
 
     public function store(Request $request)

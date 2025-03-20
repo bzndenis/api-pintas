@@ -7,6 +7,7 @@ use App\Models\TujuanPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class CapaianPembelajaranController extends Controller
 {
@@ -17,22 +18,40 @@ class CapaianPembelajaranController extends Controller
 
     public function index(Request $request)
     {
-        $mapelId = $request->query('mapel_id');
-        $sekolahId = $request->query('sekolah_id');
-        
-        $query = CapaianPembelajaran::with(['mataPelajaran', 'sekolah']);
-        
-        if ($mapelId) {
-            $query->where('mapel_id', $mapelId);
+        try {
+            $query = CapaianPembelajaran::with(['mataPelajaran', 'tujuanPembelajaran']);
+            
+            if ($request->mapel_id) {
+                $query->where('mapel_id', $request->mapel_id);
+            }
+
+            if ($request->sekolah_id) {
+                $query->where('sekolah_id', $request->sekolah_id);
+            }
+
+            $capaian = $query->orderBy('created_at', 'desc')->get();
+
+            $formattedData = [
+                'total' => $capaian->count(),
+                'capaian_pembelajaran' => $capaian->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'kode_cp' => $item->kode_cp,
+                        'deskripsi' => $item->deskripsi,
+                        'mata_pelajaran' => [
+                            'id' => $item->mataPelajaran->id,
+                            'nama_mapel' => $item->mataPelajaran->nama_mapel,
+                            'kode_mapel' => $item->mataPelajaran->kode_mapel
+                        ],
+                        'jumlah_tp' => $item->tujuanPembelajaran->count()
+                    ];
+                })
+            ];
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
-        }
-        
-        $data = $query->orderBy('created_at', 'desc')->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $data, true, false);
     }
 
     public function store(Request $request)

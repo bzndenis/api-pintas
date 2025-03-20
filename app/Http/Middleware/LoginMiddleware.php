@@ -10,6 +10,9 @@ use Illuminate\Http\Response;
 use Ramsey\Uuid\Uuid;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Helper\ResponseBuilder;
 
 // Import fungsi global
 use function public_path;
@@ -18,29 +21,31 @@ class LoginMiddleware
 {
     public function handle($request, Closure $next)
     {
-        $authHeader = $request->header('Authorization');
-
-        if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-            $token = $matches[1];
-            $user = UserAuth::where('remember_token', $token)->first();
-
-            if (!$user) {
-                return new Response('Token Tidak Valid.', 401);
-            }
-
-            // Catat aktivitas pengguna
-            $this->logUserActivity($user, $request);
-            // Update session pengguna
-            $this->updateUserSession($user, $request);
-
-            // Tambahkan user id ke request agar bisa diakses di controller
-            $request->merge(['user_id' => $user->id]);
-            $request->merge(['sekolah_id' => $user->sekolah_id]);
-
-            return $next($request);
+        $token = str_replace('Bearer ', '', $request->header('Authorization'));
+        
+        if (!$token) {
+            return ResponseBuilder::error(401, "Token tidak ditemukan");
         }
 
-        return new Response('Silakan Masukkan Token.', 401);
+        $user = User::where('remember_token', $token)->first();
+        
+        if (!$user) {
+            return ResponseBuilder::error(401, "Token tidak valid");
+        }
+
+        // Set user ke Auth facade
+        Auth::setUser($user);
+        
+        // Catat aktivitas pengguna
+        $this->logUserActivity($user, $request);
+        // Update session pengguna
+        $this->updateUserSession($user, $request);
+
+        // Tambahkan user id ke request agar bisa diakses di controller
+        $request->merge(['user_id' => $user->id]);
+        $request->merge(['sekolah_id' => $user->sekolah_id]);
+
+        return $next($request);
     }
 
     /**

@@ -33,14 +33,12 @@ class UserActivityController extends Controller
             $page = $request->input('page', 1);
             $offset = ($page - 1) * $limit;
             
-            // Filter aktivitas berdasarkan user_id jika ada
-            $query = UserActivity::query();
+            $query = UserActivity::with(['user', 'sekolah']);
             
             if ($request->input('user_id_filter')) {
                 $query->where('user_id', $request->input('user_id_filter'));
             }
             
-            // Filter berdasarkan tanggal
             if ($request->input('start_date') && $request->input('end_date')) {
                 $query->whereBetween('created_at', [
                     $request->input('start_date') . ' 00:00:00', 
@@ -48,30 +46,46 @@ class UserActivityController extends Controller
                 ]);
             }
             
-            // Filter berdasarkan sekolah_id
             $query->where('sekolah_id', $sekolahId);
             
-            // Hitung total records
             $total = $query->count();
             
-            // Ambil data dengan paginasi
-            $activities = $query->with('user')
-                ->orderBy('created_at', 'desc')
+            $activities = $query->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->offset($offset)
                 ->get();
-            
-            return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", [
-                'activities' => $activities,
-                'pagination' => [
-                    'total' => $total,
-                    'per_page' => $limit,
-                    'current_page' => $page,
-                    'last_page' => ceil($total / $limit)
-                ]
+
+            $formattedActivities = $activities->map(function($activity) {
+                return [
+                    'id' => $activity->id,
+                    'user' => [
+                        'id' => $activity->user->id,
+                        'nama_lengkap' => $activity->user->nama_lengkap,
+                        'email' => $activity->user->email,
+                        'role' => $activity->user->role
+                    ],
+                    'action' => $activity->action,
+                    'ip_address' => $activity->ip_address,
+                    'user_agent' => $activity->user_agent,
+                    'created_at' => $activity->created_at->format('Y-m-d H:i:s'),
+                    'sekolah' => [
+                        'id' => $activity->sekolah->id,
+                        'nama_sekolah' => $activity->sekolah->nama_sekolah
+                    ]
+                ];
+            });
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data aktivitas", [
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'data' => $formattedActivities
             ]);
+
         } catch (\Exception $e) {
-            return ResponseBuilder::error(500, $e->getMessage(), null);
+            \Log::error('Gagal mengambil data aktivitas: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
     }
     
@@ -84,22 +98,18 @@ class UserActivityController extends Controller
     public function getAllSessions(Request $request)
     {
         try {
-            $userId = $request->user_id;
             $sekolahId = $request->sekolah_id;
             
-            // Mendapatkan parameter paginasi
             $limit = $request->input('limit', 10);
             $page = $request->input('page', 1);
             $offset = ($page - 1) * $limit;
             
-            // Filter sesi berdasarkan user_id jika ada
-            $query = UserSession::query();
+            $query = UserSession::with(['user', 'sekolah']);
             
             if ($request->input('user_id_filter')) {
                 $query->where('user_id', $request->input('user_id_filter'));
             }
             
-            // Filter berdasarkan tanggal
             if ($request->input('start_date') && $request->input('end_date')) {
                 $query->whereBetween('login_time', [
                     $request->input('start_date') . ' 00:00:00', 
@@ -107,48 +117,54 @@ class UserActivityController extends Controller
                 ]);
             }
             
-            // Filter berdasarkan sekolah_id
             $query->where('sekolah_id', $sekolahId);
             
-            // Hitung total records
             $total = $query->count();
             
-            // Ambil data dengan paginasi
-            $sessions = $query->with('user')
-                ->orderBy('login_time', 'desc')
+            $sessions = $query->orderBy('login_time', 'desc')
                 ->limit($limit)
                 ->offset($offset)
                 ->get();
-            
-            // Format durasi ke bentuk yang lebih mudah dibaca
-            foreach ($sessions as $session) {
-                if ($session->duration) {
-                    $hours = floor($session->duration / 3600);
-                    $minutes = floor(($session->duration % 3600) / 60);
-                    $seconds = $session->duration % 60;
-                    
-                    $session->formatted_duration = sprintf(
-                        "%02d:%02d:%02d",
-                        $hours,
-                        $minutes,
-                        $seconds
-                    );
-                } else {
-                    $session->formatted_duration = "00:00:00";
-                }
-            }
-            
-            return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", [
-                'sessions' => $sessions,
-                'pagination' => [
-                    'total' => $total,
-                    'per_page' => $limit,
-                    'current_page' => $page,
-                    'last_page' => ceil($total / $limit)
-                ]
+
+            $formattedSessions = $sessions->map(function($session) {
+                $duration = $session->duration ?? 0;
+                $hours = floor($duration / 3600);
+                $minutes = floor(($duration % 3600) / 60);
+                $seconds = $duration % 60;
+                
+                return [
+                    'id' => $session->id,
+                    'user' => [
+                        'id' => $session->user->id,
+                        'nama_lengkap' => $session->user->nama_lengkap,
+                        'email' => $session->user->email,
+                        'role' => $session->user->role
+                    ],
+                    'login_time' => $session->login_time->format('Y-m-d H:i:s'),
+                    'last_activity' => $session->last_activity->format('Y-m-d H:i:s'),
+                    'duration_formatted' => sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds),
+                    'duration_seconds' => $duration,
+                    'status' => $session->status,
+                    'ip_address' => $session->ip_address,
+                    'user_agent' => $session->user_agent,
+                    'sekolah' => [
+                        'id' => $session->sekolah->id,
+                        'nama_sekolah' => $session->sekolah->nama_sekolah
+                    ]
+                ];
+            });
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data sesi", [
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'data' => $formattedSessions
             ]);
+
         } catch (\Exception $e) {
-            return ResponseBuilder::error(500, $e->getMessage(), null);
+            \Log::error('Gagal mengambil data sesi: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
     }
     

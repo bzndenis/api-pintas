@@ -1,13 +1,17 @@
 <?php
 namespace App\Models;
 
+use Illuminate\Auth\Authenticatable;
+use Laravel\Lumen\Auth\Authorizable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
+use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Ramsey\Uuid\Uuid;
 
-class User extends Model
+class User extends Model implements AuthenticatableContract, AuthorizableContract
 {
-    use SoftDeletes;
+    use Authenticatable, Authorizable, SoftDeletes;
     
     protected $table = 'users';
     
@@ -22,7 +26,8 @@ class User extends Model
         'alamat_sekolah',
         'last_login',
         'is_active',
-        'remember_token'
+        'remember_token',
+        'api_token'
     ];
     
     protected $hidden = [

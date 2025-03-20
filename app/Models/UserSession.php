@@ -10,6 +10,7 @@ class UserSession extends Model
     protected $table = 'user_sessions';
     
     protected $fillable = [
+        'id',
         'user_id',
         'login_time',
         'last_activity',

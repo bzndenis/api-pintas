@@ -7,6 +7,7 @@ use App\Models\CapaianPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class MataPelajaranController extends Controller
 {
@@ -17,22 +18,42 @@ class MataPelajaranController extends Controller
 
     public function index(Request $request)
     {
-        $sekolahId = $request->query('sekolah_id');
-        $tingkat = $request->query('tingkat');
-        
-        $query = MataPelajaran::with('sekolah');
-        
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
+        try {
+            $query = MataPelajaran::with(['sekolah', 'capaianPembelajaran']);
+            
+            if ($request->sekolah_id) {
+                $query->where('sekolah_id', $request->sekolah_id);
+            }
+            
+            if ($request->tingkat) {
+                $query->where('tingkat', $request->tingkat);
+            }
+
+            $mapel = $query->orderBy('created_at', 'desc')->get();
+
+            $formattedData = [
+                'total' => $mapel->count(),
+                'mata_pelajaran' => $mapel->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'kode_mapel' => $item->kode_mapel,
+                        'nama_mapel' => $item->nama_mapel,
+                        'tingkat' => $item->tingkat,
+                        'jumlah_cp' => $item->capaianPembelajaran->count(),
+                        'sekolah' => $item->sekolah ? [
+                            'id' => $item->sekolah->id,
+                            'nama_sekolah' => $item->sekolah->nama_sekolah
+                        ] : null
+                    ];
+                })
+            ];
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
+        } catch (\Exception $e) {
+            \Log::error('Gagal mengambil data mapel: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        if ($tingkat) {
-            $query->where('tingkat', $tingkat);
-        }
-        
-        $data = $query->orderBy('created_at', 'desc')->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $data, true, false);
     }
 
     public function store(Request $request)
@@ -40,7 +61,7 @@ class MataPelajaranController extends Controller
         $this->validate($request, [
             'kode_mapel' => 'required|string|max:20',
             'nama_mapel' => 'required|string|max:255',
-            'tingkat' => 'required|string|max:20',
+            'tingkat' => 'required|string',
             'sekolah_id' => 'required|exists:sekolah,id'
         ]);
 
@@ -125,37 +146,62 @@ class MataPelajaranController extends Controller
 
     public function destroy($id)
     {
-        $mapel = MataPelajaran::find($id);
-        
-        if (!$mapel) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
         try {
-            // Cek apakah mapel masih memiliki capaian pembelajaran
+            $mapel = MataPelajaran::find($id);
+            
+            if (!$mapel) {
+                return ResponseBuilder::error(404, "Data tidak ditemukan");
+            }
+
+            // Cek apakah mapel masih memiliki CP
             if ($mapel->capaianPembelajaran()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih memiliki capaian pembelajaran");
             }
-            
+
             $mapel->delete();
-            return ResponseBuilder::success(200, "Berhasil Menghapus Data", null, true);
+            return ResponseBuilder::success(200, "Berhasil menghapus data");
         } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal Menghapus Data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
     
     public function getCapaianPembelajaran($id)
     {
-        $mapel = MataPelajaran::find($id);
-        
-        if (!$mapel) {
-            return ResponseBuilder::error(404, "Data Mata Pelajaran Tidak ada");
+        try {
+            $mapel = MataPelajaran::with(['capaianPembelajaran.tujuanPembelajaran'])
+                ->find($id);
+
+            if (!$mapel) {
+                return ResponseBuilder::error(404, "Data tidak ditemukan");
+            }
+
+            $formattedData = [
+                'mata_pelajaran' => [
+                    'id' => $mapel->id,
+                    'kode_mapel' => $mapel->kode_mapel,
+                    'nama_mapel' => $mapel->nama_mapel
+                ],
+                'capaian_pembelajaran' => $mapel->capaianPembelajaran->map(function($cp) {
+                    return [
+                        'id' => $cp->id,
+                        'kode_cp' => $cp->kode_cp,
+                        'deskripsi' => $cp->deskripsi,
+                        'jumlah_tp' => $cp->tujuanPembelajaran->count(),
+                        'tujuan_pembelajaran' => $cp->tujuanPembelajaran->map(function($tp) {
+                            return [
+                                'id' => $tp->id,
+                                'kode_tp' => $tp->kode_tp,
+                                'deskripsi' => $tp->deskripsi,
+                                'bobot' => $tp->bobot
+                            ];
+                        })
+                    ];
+                })
+            ];
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        $cp = CapaianPembelajaran::where('mapel_id', $id)
-                               ->orderBy('created_at', 'desc')
-                               ->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data Capaian Pembelajaran", $cp, true);
     }
 } 

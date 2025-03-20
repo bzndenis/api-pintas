@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TujuanPembelajaran;
+use App\Models\CapaianPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
@@ -16,22 +17,43 @@ class TujuanPembelajaranController extends Controller
 
     public function index(Request $request)
     {
-        $cpId = $request->query('cp_id');
-        $sekolahId = $request->query('sekolah_id');
-        
-        $query = TujuanPembelajaran::with(['capaianPembelajaran.mataPelajaran', 'sekolah']);
-        
-        if ($cpId) {
-            $query->where('cp_id', $cpId);
+        try {
+            $query = TujuanPembelajaran::with(['capaianPembelajaran.mataPelajaran']);
+            
+            if ($request->cp_id) {
+                $query->where('cp_id', $request->cp_id);
+            }
+
+            if ($request->sekolah_id) {
+                $query->where('sekolah_id', $request->sekolah_id);
+            }
+
+            $tujuan = $query->orderBy('created_at', 'desc')->get();
+
+            $formattedData = [
+                'total' => $tujuan->count(),
+                'tujuan_pembelajaran' => $tujuan->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'kode_tp' => $item->kode_tp,
+                        'deskripsi' => $item->deskripsi,
+                        'bobot' => $item->bobot,
+                        'capaian_pembelajaran' => [
+                            'id' => $item->capaianPembelajaran->id,
+                            'kode_cp' => $item->capaianPembelajaran->kode_cp,
+                            'mata_pelajaran' => [
+                                'id' => $item->capaianPembelajaran->mataPelajaran->id,
+                                'nama_mapel' => $item->capaianPembelajaran->mataPelajaran->nama_mapel
+                            ]
+                        ]
+                    ];
+                })
+            ];
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
-        
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
-        }
-        
-        $data = $query->orderBy('created_at', 'desc')->get();
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $data, true, false);
     }
 
     public function store(Request $request)
@@ -39,7 +61,7 @@ class TujuanPembelajaranController extends Controller
         $this->validate($request, [
             'kode_tp' => 'required|string|max:50',
             'deskripsi' => 'required|string',
-            'bobot' => 'required|numeric|min:0',
+            'bobot' => 'required|numeric|min:0|max:100',
             'cp_id' => 'required|exists:capaian_pembelajaran,id',
             'sekolah_id' => 'required|exists:sekolah,id'
         ]);
@@ -49,8 +71,8 @@ class TujuanPembelajaranController extends Controller
             
             // Cek apakah kode TP sudah ada untuk CP yang sama
             $exists = TujuanPembelajaran::where('kode_tp', $request->kode_tp)
-                                       ->where('cp_id', $request->cp_id)
-                                       ->exists();
+                                      ->where('cp_id', $request->cp_id)
+                                      ->exists();
             
             if ($exists) {
                 return ResponseBuilder::error(400, "Kode TP sudah digunakan untuk capaian pembelajaran ini");
@@ -62,10 +84,10 @@ class TujuanPembelajaranController extends Controller
             
             $tp->load(['capaianPembelajaran.mataPelajaran', 'sekolah']);
             
-            return ResponseBuilder::success(201, "Berhasil Menambahkan Data", $tp, true);
+            return ResponseBuilder::success(201, "Berhasil menambah data", $tp);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal Menambahkan Data: " . $e->getMessage());
+            DB::rollback();
+            return ResponseBuilder::error(500, "Gagal menambah data: " . $e->getMessage());
         }
     }
 
@@ -85,31 +107,26 @@ class TujuanPembelajaranController extends Controller
         $tp = TujuanPembelajaran::find($id);
         
         if (!$tp) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
+            return ResponseBuilder::error(404, "Data tidak ditemukan");
         }
-        
+
         $this->validate($request, [
             'kode_tp' => 'sometimes|required|string|max:50',
             'deskripsi' => 'sometimes|required|string',
-            'bobot' => 'sometimes|required|numeric|min:0',
-            'cp_id' => 'sometimes|required|exists:capaian_pembelajaran,id',
-            'sekolah_id' => 'sometimes|required|exists:sekolah,id'
+            'bobot' => 'sometimes|required|numeric|min:0|max:100'
         ]);
-        
+
         try {
             DB::beginTransaction();
             
-            // Cek apakah kode TP sudah ada untuk CP yang sama (kecuali diri sendiri)
-            if (($request->has('kode_tp') && $request->kode_tp != $tp->kode_tp) || 
-                ($request->has('cp_id') && $request->cp_id != $tp->cp_id)) {
-                
-                $exists = TujuanPembelajaran::where('kode_tp', $request->kode_tp ?? $tp->kode_tp)
-                                           ->where('cp_id', $request->cp_id ?? $tp->cp_id)
-                                           ->where('id', '!=', $id)
-                                           ->exists();
+            if ($request->has('kode_tp') && $request->kode_tp != $tp->kode_tp) {
+                $exists = TujuanPembelajaran::where('kode_tp', $request->kode_tp)
+                                          ->where('cp_id', $tp->cp_id)
+                                          ->where('id', '!=', $id)
+                                          ->exists();
                 
                 if ($exists) {
-                    return ResponseBuilder::error(400, "Kode TP sudah digunakan untuk capaian pembelajaran ini");
+                    return ResponseBuilder::error(400, "Kode TP sudah digunakan");
                 }
             }
             
@@ -119,31 +136,31 @@ class TujuanPembelajaranController extends Controller
             
             $tp->load(['capaianPembelajaran.mataPelajaran', 'sekolah']);
             
-            return ResponseBuilder::success(200, "Berhasil Mengubah Data", $tp, true);
+            return ResponseBuilder::success(200, "Berhasil mengubah data", $tp);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal Mengubah Data: " . $e->getMessage());
+            DB::rollback();
+            return ResponseBuilder::error(500, "Gagal mengubah data: " . $e->getMessage());
         }
     }
 
     public function destroy($id)
     {
-        $tp = TujuanPembelajaran::find($id);
-        
-        if (!$tp) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
         try {
+            $tp = TujuanPembelajaran::find($id);
+            
+            if (!$tp) {
+                return ResponseBuilder::error(404, "Data tidak ditemukan");
+            }
+
             // Cek apakah TP masih memiliki nilai siswa
             if ($tp->nilaiSiswa()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus tujuan pembelajaran yang masih memiliki nilai siswa");
             }
-            
+
             $tp->delete();
-            return ResponseBuilder::success(200, "Berhasil Menghapus Data", null, true);
+            return ResponseBuilder::success(200, "Berhasil menghapus data");
         } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal Menghapus Data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 
