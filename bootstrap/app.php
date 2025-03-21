@@ -23,9 +23,31 @@ $app = new Laravel\Lumen\Application(
     dirname(__DIR__)
 );
 
+// Aktifkan Facades dan Eloquent
 $app->withFacades();
-
 $app->withEloquent();
+
+// Aktifkan View dengan konfigurasi path yang benar
+$app->singleton('view', function ($app) {
+    $config = [
+        'paths' => [
+            realpath(base_path('resources/views'))
+        ],
+        'compiled' => realpath(storage_path('framework/views')),
+    ];
+
+    return new \Illuminate\View\Factory(
+        new \Illuminate\View\Engines\EngineResolver(),
+        new \Illuminate\View\FileViewFinder(
+            new \Illuminate\Filesystem\Filesystem(),
+            $config['paths']
+        ),
+        new \Illuminate\Events\Dispatcher()
+    );
+});
+
+// Atau gunakan cara yang lebih sederhana
+$app->register(\Illuminate\View\ViewServiceProvider::class);
 
 /*
 |--------------------------------------------------------------------------

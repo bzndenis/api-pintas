@@ -1,0 +1,669 @@
+===========================================================
+DOKUMENTASI API SISTEM MANAJEMEN SEKOLAH
+===========================================================
+
+===========================================================
+DAFTAR ISI
+===========================================================
+1. Pendahuluan
+2. Autentikasi
+3. Endpoint API
+   3.1. Autentikasi
+   3.2. Pengguna
+   3.3. Aktivitas Pengguna
+   3.4. Sekolah
+   3.5. Guru
+   3.6. Tahun Ajaran
+   3.7. Kelas
+   3.8. Siswa
+   3.9. Mata Pelajaran
+   3.10. Capaian Pembelajaran
+   3.11. Tujuan Pembelajaran
+   3.12. Nilai Siswa
+   3.13. Pertemuan Bulanan
+   3.14. Absensi Siswa
+   3.15. API Mobile untuk Guru
+   3.16. Admin - Manajemen Guru
+
+===========================================================
+1. PENDAHULUAN
+===========================================================
+Dokumentasi ini berisi informasi tentang endpoint API yang tersedia dalam Sistem Manajemen Sekolah. API ini dibangun menggunakan framework Lumen dan mengikuti prinsip RESTful API.
+
+===========================================================
+2. AUTENTIKASI
+===========================================================
+Sebagian besar endpoint API memerlukan autentikasi. Autentikasi menggunakan middleware 'login' yang memvalidasi token akses. Beberapa endpoint juga memerlukan hak akses admin dengan middleware 'admin'.
+
+===========================================================
+3. ENDPOINT API
+===========================================================
+
+-----------------------------------------------------------
+3.1. AUTENTIKASI
+-----------------------------------------------------------
+Prefix: /auth
+
+POST /auth/register
+- Deskripsi: Mendaftarkan pengguna baru
+- Controller: AuthController@register
+
+POST /auth/login
+- Deskripsi: Melakukan login dan mendapatkan token akses
+- Controller: AuthController@login
+
+POST /auth/logout
+- Deskripsi: Melakukan logout dan menghapus token akses
+- Controller: AuthController@logout
+
+-----------------------------------------------------------
+3.2. PENGGUNA
+-----------------------------------------------------------
+Prefix: /user
+Middleware: login
+
+GET /user
+- Deskripsi: Mendapatkan daftar semua pengguna
+- Controller: UserController@index
+
+POST /user
+- Deskripsi: Membuat pengguna baru
+- Controller: UserController@store
+
+GET /user/profile
+- Deskripsi: Mendapatkan profil pengguna yang sedang login
+- Controller: UserController@getUserProfile
+
+POST /user/change-password
+- Deskripsi: Mengubah password pengguna
+- Controller: UserController@changePassword
+
+GET /user/pagination
+- Deskripsi: Mendapatkan daftar pengguna dengan pagination
+- Controller: UserController@pagenationUser
+
+GET /user/{id}
+- Deskripsi: Mendapatkan detail pengguna berdasarkan ID
+- Controller: UserController@show
+
+PUT /user/{id}
+- Deskripsi: Memperbarui data pengguna
+- Controller: UserController@update
+
+DELETE /user/{id}
+- Deskripsi: Menghapus pengguna
+- Controller: UserController@destroy
+
+-----------------------------------------------------------
+3.3. AKTIVITAS PENGGUNA
+-----------------------------------------------------------
+Prefix: /activity
+Middleware: login
+
+GET /activity
+- Deskripsi: Mendapatkan semua aktivitas pengguna
+- Controller: UserActivityController@getAllActivities
+
+GET /activity/sessions
+- Deskripsi: Mendapatkan semua sesi pengguna
+- Controller: UserActivityController@getAllSessions
+
+GET /activity/logs
+- Deskripsi: Mendapatkan log aktivitas pengguna
+- Controller: UserActivityController@getActivityLogs
+
+GET /activity/dates
+- Deskripsi: Mendapatkan tanggal log aktivitas
+- Controller: UserActivityController@getActivityLogDates
+
+GET /activity/statistics
+- Deskripsi: Mendapatkan statistik aktivitas
+- Controller: UserActivityController@getActivityStatistics
+
+GET /activity/usage-time
+- Deskripsi: Mendapatkan waktu penggunaan
+- Controller: UserActivityController@getUsageTime
+
+-----------------------------------------------------------
+3.4. SEKOLAH
+-----------------------------------------------------------
+Prefix: /sekolah
+Middleware: login
+
+GET /sekolah
+- Deskripsi: Mendapatkan daftar semua sekolah
+- Controller: SekolahController@index
+
+POST /sekolah
+- Deskripsi: Membuat sekolah baru
+- Controller: SekolahController@store
+
+GET /sekolah/statistics/summary
+- Deskripsi: Mendapatkan ringkasan statistik sekolah
+- Controller: SekolahController@getStatistics
+
+GET /sekolah/{id}
+- Deskripsi: Mendapatkan detail sekolah berdasarkan ID
+- Controller: SekolahController@show
+
+PUT /sekolah/{id}
+- Deskripsi: Memperbarui data sekolah
+- Controller: SekolahController@update
+
+DELETE /sekolah/{id}
+- Deskripsi: Menghapus sekolah
+- Controller: SekolahController@destroy
+
+GET /sekolah/{id}/guru
+- Deskripsi: Mendapatkan daftar guru di sekolah
+- Controller: SekolahController@getGuru
+
+GET /sekolah/{id}/siswa
+- Deskripsi: Mendapatkan daftar siswa di sekolah
+- Controller: SekolahController@getSiswa
+
+GET /sekolah/{id}/kelas
+- Deskripsi: Mendapatkan daftar kelas di sekolah
+- Controller: SekolahController@getKelas
+
+-----------------------------------------------------------
+3.5. GURU
+-----------------------------------------------------------
+Prefix: /guru
+Middleware: login
+
+GET /guru
+- Deskripsi: Mendapatkan daftar semua guru
+- Controller: GuruController@index
+
+POST /guru
+- Deskripsi: Membuat data guru baru
+- Controller: GuruController@store
+
+POST /guru/import
+- Deskripsi: Mengimpor data guru dari file
+- Controller: GuruController@import
+
+GET /guru/{id}
+- Deskripsi: Mendapatkan detail guru berdasarkan ID
+- Controller: GuruController@show
+
+PUT /guru/{id}
+- Deskripsi: Memperbarui data guru
+- Controller: GuruController@update
+
+DELETE /guru/{id}
+- Deskripsi: Menghapus data guru
+- Controller: GuruController@destroy
+
+GET /guru/{id}/jadwal
+- Deskripsi: Mendapatkan jadwal guru
+- Controller: GuruController@getJadwal
+
+GET /guru/{id}/kelas
+- Deskripsi: Mendapatkan kelas yang diajar guru
+- Controller: GuruController@getKelas
+
+GET /guru/{id}/mapel
+- Deskripsi: Mendapatkan mata pelajaran yang diajar guru
+- Controller: GuruController@getMapel
+
+-----------------------------------------------------------
+3.6. TAHUN AJARAN
+-----------------------------------------------------------
+Prefix: /tahun-ajaran
+Middleware: login
+
+GET /tahun-ajaran
+- Deskripsi: Mendapatkan daftar semua tahun ajaran
+- Controller: TahunAjaranController@index
+
+POST /tahun-ajaran
+- Deskripsi: Membuat tahun ajaran baru
+- Controller: TahunAjaranController@store
+
+GET /tahun-ajaran/{id}
+- Deskripsi: Mendapatkan detail tahun ajaran berdasarkan ID
+- Controller: TahunAjaranController@show
+
+PUT /tahun-ajaran/{id}
+- Deskripsi: Memperbarui data tahun ajaran
+- Controller: TahunAjaranController@update
+
+DELETE /tahun-ajaran/{id}
+- Deskripsi: Menghapus tahun ajaran
+- Controller: TahunAjaranController@destroy
+
+PUT /tahun-ajaran/{id}/activate
+- Deskripsi: Mengaktifkan tahun ajaran
+- Controller: TahunAjaranController@activate
+
+-----------------------------------------------------------
+3.7. KELAS
+-----------------------------------------------------------
+Prefix: /kelas
+Middleware: login
+
+GET /kelas
+- Deskripsi: Mendapatkan daftar semua kelas
+- Controller: KelasController@index
+
+POST /kelas
+- Deskripsi: Membuat kelas baru
+- Controller: KelasController@store
+
+GET /kelas/{id}
+- Deskripsi: Mendapatkan detail kelas berdasarkan ID
+- Controller: KelasController@show
+
+PUT /kelas/{id}
+- Deskripsi: Memperbarui data kelas
+- Controller: KelasController@update
+
+DELETE /kelas/{id}
+- Deskripsi: Menghapus kelas
+- Controller: KelasController@destroy
+
+GET /kelas/{id}/siswa
+- Deskripsi: Mendapatkan daftar siswa di kelas
+- Controller: KelasController@getSiswa
+
+GET /kelas/{id}/jadwal
+- Deskripsi: Mendapatkan jadwal kelas
+- Controller: KelasController@getJadwal
+
+GET /kelas/{id}/nilai
+- Deskripsi: Mendapatkan nilai siswa di kelas
+- Controller: KelasController@getNilai
+
+GET /kelas/{id}/absensi
+- Deskripsi: Mendapatkan absensi siswa di kelas
+- Controller: KelasController@getAbsensi
+
+GET /kelas/{id}/guru
+- Deskripsi: Mendapatkan daftar guru yang mengajar di kelas
+- Controller: KelasController@getGuru
+
+-----------------------------------------------------------
+3.8. SISWA
+-----------------------------------------------------------
+Prefix: /siswa
+Middleware: login
+
+GET /siswa
+- Deskripsi: Mendapatkan daftar semua siswa
+- Controller: SiswaController@index
+
+POST /siswa
+- Deskripsi: Membuat data siswa baru
+- Controller: SiswaController@store
+
+POST /siswa/import
+- Deskripsi: Mengimpor data siswa dari file
+- Controller: SiswaController@import
+
+GET /siswa/{id}
+- Deskripsi: Mendapatkan detail siswa berdasarkan ID
+- Controller: SiswaController@show
+
+PUT /siswa/{id}
+- Deskripsi: Memperbarui data siswa
+- Controller: SiswaController@update
+
+DELETE /siswa/{id}
+- Deskripsi: Menghapus data siswa
+- Controller: SiswaController@destroy
+
+GET /siswa/{id}/nilai
+- Deskripsi: Mendapatkan nilai siswa
+- Controller: SiswaController@getNilai
+
+GET /siswa/{id}/absensi
+- Deskripsi: Mendapatkan absensi siswa
+- Controller: SiswaController@getAbsensi
+
+-----------------------------------------------------------
+3.9. MATA PELAJARAN
+-----------------------------------------------------------
+Prefix: /mapel
+Middleware: login
+
+GET /mapel
+- Deskripsi: Mendapatkan daftar semua mata pelajaran
+- Controller: MataPelajaranController@index
+
+POST /mapel
+- Deskripsi: Membuat mata pelajaran baru
+- Controller: MataPelajaranController@store
+
+GET /mapel/{id}
+- Deskripsi: Mendapatkan detail mata pelajaran berdasarkan ID
+- Controller: MataPelajaranController@show
+
+PUT /mapel/{id}
+- Deskripsi: Memperbarui data mata pelajaran
+- Controller: MataPelajaranController@update
+
+DELETE /mapel/{id}
+- Deskripsi: Menghapus mata pelajaran
+- Controller: MataPelajaranController@destroy
+
+GET /mapel/{id}/cp
+- Deskripsi: Mendapatkan capaian pembelajaran mata pelajaran
+- Controller: MataPelajaranController@getCapaianPembelajaran
+
+-----------------------------------------------------------
+3.10. CAPAIAN PEMBELAJARAN
+-----------------------------------------------------------
+Prefix: /cp
+Middleware: login
+
+GET /cp
+- Deskripsi: Mendapatkan daftar semua capaian pembelajaran
+- Controller: CapaianPembelajaranController@index
+
+POST /cp
+- Deskripsi: Membuat capaian pembelajaran baru
+- Controller: CapaianPembelajaranController@store
+
+GET /cp/{id}
+- Deskripsi: Mendapatkan detail capaian pembelajaran berdasarkan ID
+- Controller: CapaianPembelajaranController@show
+
+PUT /cp/{id}
+- Deskripsi: Memperbarui data capaian pembelajaran
+- Controller: CapaianPembelajaranController@update
+
+DELETE /cp/{id}
+- Deskripsi: Menghapus capaian pembelajaran
+- Controller: CapaianPembelajaranController@destroy
+
+GET /cp/{id}/tp
+- Deskripsi: Mendapatkan tujuan pembelajaran dari capaian pembelajaran
+- Controller: CapaianPembelajaranController@getTujuanPembelajaran
+
+-----------------------------------------------------------
+3.11. TUJUAN PEMBELAJARAN
+-----------------------------------------------------------
+Prefix: /tp
+Middleware: login
+
+GET /tp
+- Deskripsi: Mendapatkan daftar semua tujuan pembelajaran
+- Controller: TujuanPembelajaranController@index
+
+POST /tp
+- Deskripsi: Membuat tujuan pembelajaran baru
+- Controller: TujuanPembelajaranController@store
+
+GET /tp/{id}
+- Deskripsi: Mendapatkan detail tujuan pembelajaran berdasarkan ID
+- Controller: TujuanPembelajaranController@show
+
+PUT /tp/{id}
+- Deskripsi: Memperbarui data tujuan pembelajaran
+- Controller: TujuanPembelajaranController@update
+
+DELETE /tp/{id}
+- Deskripsi: Menghapus tujuan pembelajaran
+- Controller: TujuanPembelajaranController@destroy
+
+-----------------------------------------------------------
+3.12. NILAI SISWA
+-----------------------------------------------------------
+Prefix: /nilai
+Middleware: login
+
+GET /nilai
+- Deskripsi: Mendapatkan daftar semua nilai siswa
+- Controller: NilaiSiswaController@index
+
+POST /nilai
+- Deskripsi: Membuat nilai siswa baru
+- Controller: NilaiSiswaController@store
+
+POST /nilai/import
+- Deskripsi: Mengimpor data nilai siswa dari file
+- Controller: NilaiSiswaController@import
+
+GET /nilai/report/siswa/{siswaId}
+- Deskripsi: Mendapatkan laporan nilai berdasarkan siswa
+- Controller: NilaiSiswaController@reportBySiswa
+
+GET /nilai/report/kelas/{kelasId}
+- Deskripsi: Mendapatkan laporan nilai berdasarkan kelas
+- Controller: NilaiSiswaController@reportByKelas
+
+GET /nilai/{id}
+- Deskripsi: Mendapatkan detail nilai berdasarkan ID
+- Controller: NilaiSiswaController@show
+
+PUT /nilai/{id}
+- Deskripsi: Memperbarui data nilai
+- Controller: NilaiSiswaController@update
+
+DELETE /nilai/{id}
+- Deskripsi: Menghapus nilai
+- Controller: NilaiSiswaController@destroy
+
+-----------------------------------------------------------
+3.13. PERTEMUAN BULANAN
+-----------------------------------------------------------
+Prefix: /pertemuan
+Middleware: login
+
+GET /pertemuan
+- Deskripsi: Mendapatkan daftar semua pertemuan bulanan
+- Controller: PertemuanBulananController@index
+
+POST /pertemuan
+- Deskripsi: Membuat pertemuan bulanan baru
+- Controller: PertemuanBulananController@store
+
+GET /pertemuan/kelas/{kelasId}
+- Deskripsi: Mendapatkan pertemuan berdasarkan kelas
+- Controller: PertemuanBulananController@getByKelas
+
+GET /pertemuan/bulan/{bulan}
+- Deskripsi: Mendapatkan pertemuan berdasarkan bulan
+- Controller: PertemuanBulananController@getByBulan
+
+GET /pertemuan/tahun/{tahun}
+- Deskripsi: Mendapatkan pertemuan berdasarkan tahun
+- Controller: PertemuanBulananController@getByTahun
+
+GET /pertemuan/{id}
+- Deskripsi: Mendapatkan detail pertemuan berdasarkan ID
+- Controller: PertemuanBulananController@show
+
+PUT /pertemuan/{id}
+- Deskripsi: Memperbarui data pertemuan
+- Controller: PertemuanBulananController@update
+
+DELETE /pertemuan/{id}
+- Deskripsi: Menghapus pertemuan
+- Controller: PertemuanBulananController@destroy
+
+-----------------------------------------------------------
+3.14. ABSENSI SISWA
+-----------------------------------------------------------
+Prefix: /absensi
+Middleware: login
+
+GET /absensi
+- Deskripsi: Mendapatkan daftar semua absensi siswa
+- Controller: AbsensiSiswaController@index
+
+POST /absensi
+- Deskripsi: Membuat absensi siswa baru
+- Controller: AbsensiSiswaController@store
+
+POST /absensi/import
+- Deskripsi: Mengimpor data absensi siswa dari file
+- Controller: AbsensiSiswaController@import
+
+GET /absensi/rekap
+- Deskripsi: Mendapatkan rekap absensi
+- Controller: AbsensiSiswaController@getRekapAbsensi
+
+GET /absensi/report/siswa/{siswaId}
+- Deskripsi: Mendapatkan laporan absensi berdasarkan siswa
+- Controller: AbsensiSiswaController@reportBySiswa
+
+GET /absensi/report/kelas/{kelasId}
+- Deskripsi: Mendapatkan laporan absensi berdasarkan kelas
+- Controller: AbsensiSiswaController@reportByKelas
+
+GET /absensi/{id}
+- Deskripsi: Mendapatkan detail absensi berdasarkan ID
+- Controller: AbsensiSiswaController@show
+
+PUT /absensi/{id}
+- Deskripsi: Memperbarui data absensi
+- Controller: AbsensiSiswaController@update
+
+DELETE /absensi/{id}
+- Deskripsi: Menghapus absensi
+- Controller: AbsensiSiswaController@destroy
+
+-----------------------------------------------------------
+3.15. API MOBILE UNTUK GURU
+-----------------------------------------------------------
+Prefix: /api/guru
+Middleware: login
+
+GET /api/guru/profile
+- Deskripsi: Mendapatkan profil guru
+- Controller: API\GuruController@getProfile
+
+PUT /api/guru/profile
+- Deskripsi: Memperbarui profil guru
+- Controller: API\GuruController@updateProfile
+
+GET /api/guru/kelas
+- Deskripsi: Mendapatkan kelas yang diajar guru
+- Controller: API\GuruController@getKelas
+
+GET /api/guru/kelas/{id}/siswa
+- Deskripsi: Mendapatkan siswa di kelas
+- Controller: API\GuruController@getSiswaByKelas
+
+GET /api/guru/kelas/{id}/jadwal
+- Deskripsi: Mendapatkan jadwal kelas
+- Controller: API\GuruController@getJadwalKelas
+
+GET /api/guru/mapel
+- Deskripsi: Mendapatkan mata pelajaran yang diajar guru
+- Controller: API\GuruController@getMapel
+
+GET /api/guru/mapel/{id}/materi
+- Deskripsi: Mendapatkan materi mata pelajaran
+- Controller: API\GuruController@getMateri
+
+GET /api/guru/cp/{mapelId}
+- Deskripsi: Mendapatkan capaian pembelajaran mata pelajaran
+- Controller: API\GuruController@getCapaianPembelajaran
+
+GET /api/guru/tp/{cpId}
+- Deskripsi: Mendapatkan tujuan pembelajaran dari capaian pembelajaran
+- Controller: API\GuruController@getTujuanPembelajaran
+
+POST /api/guru/nilai/batch
+- Deskripsi: Membuat nilai siswa secara batch
+- Controller: API\GuruController@storeNilaiBatch
+
+POST /api/guru/nilai
+- Deskripsi: Membuat nilai siswa
+- Controller: API\GuruController@storeNilai
+
+PUT /api/guru/nilai/{id}
+- Deskripsi: Memperbarui nilai siswa
+- Controller: API\GuruController@updateNilai
+
+POST /api/guru/pertemuan
+- Deskripsi: Membuat pertemuan baru
+- Controller: API\GuruController@storePertemuan
+
+PUT /api/guru/pertemuan/{id}
+- Deskripsi: Memperbarui data pertemuan
+- Controller: API\GuruController@updatePertemuan
+
+POST /api/guru/absensi/batch
+- Deskripsi: Membuat absensi siswa secara batch
+- Controller: API\GuruController@storeAbsensiBatch
+
+POST /api/guru/absensi
+- Deskripsi: Membuat absensi siswa
+- Controller: API\GuruController@storeAbsensi
+
+GET /api/guru/report/nilai/{kelasId}
+- Deskripsi: Mendapatkan laporan nilai kelas
+- Controller: API\GuruController@reportNilaiKelas
+
+GET /api/guru/report/absensi/{kelasId}
+- Deskripsi: Mendapatkan laporan absensi kelas
+- Controller: API\GuruController@reportAbsensiKelas
+
+GET /api/guru/report/pembelajaran/{kelasId}
+- Deskripsi: Mendapatkan laporan pembelajaran kelas
+- Controller: API\GuruController@reportPembelajaran
+
+GET /api/guru/dashboard/summary
+- Deskripsi: Mendapatkan ringkasan dashboard guru
+- Controller: API\GuruController@getDashboardSummary
+
+GET /api/guru/dashboard/activities
+- Deskripsi: Mendapatkan aktivitas terbaru guru
+- Controller: API\GuruController@getRecentActivities
+
+-----------------------------------------------------------
+3.16. ADMIN - MANAJEMEN GURU
+-----------------------------------------------------------
+Prefix: /admin/guru
+Middleware: login, admin
+
+GET /admin/guru
+- Deskripsi: Mendapatkan daftar semua guru (admin)
+- Controller: Admin\GuruController@index
+
+POST /admin/guru
+- Deskripsi: Membuat data guru baru (admin)
+- Controller: Admin\GuruController@store
+
+GET /admin/guru/{id}
+- Deskripsi: Mendapatkan detail guru berdasarkan ID (admin)
+- Controller: Admin\GuruController@show
+
+PUT /admin/guru/{id}
+- Deskripsi: Memperbarui data guru (admin)
+- Controller: Admin\GuruController@update
+
+DELETE /admin/guru/{id}
+- Deskripsi: Menghapus data guru (admin)
+- Controller: Admin\GuruController@destroy
+
+POST /admin/guru/reset-password/{id}
+- Deskripsi: Mereset password guru (admin)
+- Controller: Admin\GuruController@resetPassword
+
+POST /admin/guru/activate/{id}
+- Deskripsi: Mengaktifkan akun guru (admin)
+- Controller: Admin\GuruController@activate
+
+POST /admin/guru/deactivate/{id}
+- Deskripsi: Menonaktifkan akun guru (admin)
+- Controller: Admin\GuruController@deactivate
+
+===========================================================
+CATATAN PENTING
+===========================================================
+1. Semua endpoint kecuali /auth memerlukan autentikasi dengan token.
+2. Endpoint dengan prefix /admin memerlukan hak akses admin.
+3. Urutan rute statis dan dinamis penting untuk diperhatikan. Rute statis harus ditempatkan sebelum rute dinamis untuk menghindari konflik.
+4. Format respons API menggunakan JSON.
+
+===========================================================
+KONTAK
+===========================================================
+Untuk pertanyaan atau bantuan lebih lanjut, silakan hubungi:
+Email: support@sistemmanajemensekolah.com

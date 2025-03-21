@@ -14,7 +14,320 @@
 */
 
 $router->get('/', function () use ($router) {
-    return $router->app->version();
+    $routes = [];
+    
+    // Dapatkan semua route yang terdaftar
+    foreach ($router->getRoutes() as $route) {
+        $routes[] = [
+            'method' => $route['method'],
+            'uri' => $route['uri'],
+            'action' => is_callable($route['action']) ? 'Closure' : (is_array($route['action']) ? json_encode($route['action']) : $route['action']),
+        ];
+    }
+    
+    // Kelompokkan routes berdasarkan prefix
+    $groupedRoutes = [];
+    foreach ($routes as $route) {
+        $uri = $route['uri'];
+        $parts = explode('/', trim($uri, '/'));
+        $prefix = !empty($parts[0]) ? $parts[0] : 'root';
+        
+        if (!isset($groupedRoutes[$prefix])) {
+            $groupedRoutes[$prefix] = [];
+        }
+        
+        $groupedRoutes[$prefix][] = $route;
+    }
+    
+    // Buat HTML untuk tabel routes
+    $routesHtml = '';
+    foreach ($groupedRoutes as $prefix => $prefixRoutes) {
+        $prefixTitle = $prefix === 'root' ? 'Root Endpoints' : ucfirst($prefix) . ' Endpoints';
+        
+        $routesHtml .= "
+        <div class='endpoint-group'>
+            <h3>{$prefixTitle}</h3>
+            <div class='endpoint-list'>";
+        
+        foreach ($prefixRoutes as $route) {
+            $method = $route['method'];
+            $methodClass = strtolower($method);
+            $uri = $route['uri'];
+            $action = $route['action'];
+            
+            $routesHtml .= "
+            <div class='endpoint-card'>
+                <div class='endpoint-header'>
+                    <span class='method {$methodClass}'>{$method}</span>
+                    <span class='uri'>{$uri}</span>
+                </div>
+                <div class='endpoint-body'>
+                    <div class='action-label'>Controller Action:</div>
+                    <div class='action-value'>{$action}</div>
+                </div>
+            </div>";
+        }
+        
+        $routesHtml .= "
+            </div>
+        </div>";
+    }
+    
+    $version = $router->app->version();
+    $year = date('Y');
+    
+    $html = <<<HTML
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>API Documentation</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            :root {
+                --primary-color: #3b82f6;
+                --primary-dark: #2563eb;
+                --secondary-color: #64748b;
+                --success-color: #10b981;
+                --warning-color: #f59e0b;
+                --danger-color: #ef4444;
+                --light-color: #f8fafc;
+                --dark-color: #1e293b;
+                --border-color: #e2e8f0;
+                --card-bg: #ffffff;
+                --body-bg: #f1f5f9;
+                --header-bg: #1e293b;
+                --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                --radius: 0.5rem;
+            }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Inter', sans-serif;
+                background-color: var(--body-bg);
+                color: var(--dark-color);
+                line-height: 1.6;
+            }
+            
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 2rem;
+            }
+            
+            header {
+                background-color: var(--header-bg);
+                color: white;
+                padding: 3rem 0;
+                text-align: center;
+                border-radius: var(--radius);
+                margin-bottom: 2rem;
+                box-shadow: var(--shadow-lg);
+            }
+            
+            header h1 {
+                font-size: 2.5rem;
+                margin-bottom: 0.5rem;
+                font-weight: 700;
+            }
+            
+            header p {
+                font-size: 1.2rem;
+                opacity: 0.9;
+                margin-bottom: 1rem;
+            }
+            
+            .version {
+                background-color: var(--primary-color);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 2rem;
+                font-size: 0.875rem;
+                font-weight: 500;
+                display: inline-block;
+                box-shadow: var(--shadow);
+            }
+            
+            .content {
+                background-color: var(--card-bg);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                margin-bottom: 2rem;
+            }
+            
+            .section {
+                padding: 2rem;
+            }
+            
+            .section h2 {
+                font-size: 1.5rem;
+                color: var(--dark-color);
+                margin-bottom: 1rem;
+                padding-bottom: 0.75rem;
+                border-bottom: 2px solid var(--border-color);
+            }
+            
+            .section p {
+                margin-bottom: 1.5rem;
+                color: var(--secondary-color);
+            }
+            
+            .endpoint-group {
+                margin-bottom: 2rem;
+                background-color: var(--light-color);
+                border-radius: var(--radius);
+                overflow: hidden;
+                box-shadow: var(--shadow-sm);
+            }
+            
+            .endpoint-group h3 {
+                padding: 1rem 1.5rem;
+                background-color: var(--header-bg);
+                color: white;
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+            
+            .endpoint-list {
+                padding: 1rem;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                gap: 1rem;
+            }
+            
+            .endpoint-card {
+                background-color: var(--card-bg);
+                border-radius: var(--radius);
+                overflow: hidden;
+                box-shadow: var(--shadow);
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            
+            .endpoint-card:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--shadow-lg);
+            }
+            
+            .endpoint-header {
+                padding: 1rem;
+                display: flex;
+                align-items: center;
+                border-bottom: 1px solid var(--border-color);
+            }
+            
+            .endpoint-body {
+                padding: 1rem;
+            }
+            
+            .method {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                border-radius: 0.25rem;
+                font-size: 0.75rem;
+                font-weight: 700;
+                color: white;
+                text-transform: uppercase;
+                margin-right: 0.75rem;
+                min-width: 60px;
+                text-align: center;
+            }
+            
+            .uri {
+                font-family: monospace;
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: var(--dark-color);
+                word-break: break-all;
+            }
+            
+            .action-label {
+                font-size: 0.75rem;
+                color: var(--secondary-color);
+                margin-bottom: 0.25rem;
+            }
+            
+            .action-value {
+                font-family: monospace;
+                font-size: 0.8125rem;
+                color: var(--dark-color);
+                background-color: var(--light-color);
+                padding: 0.5rem;
+                border-radius: 0.25rem;
+                word-break: break-all;
+            }
+            
+            .get { background-color: var(--primary-color); }
+            .post { background-color: var(--success-color); }
+            .put { background-color: var(--warning-color); }
+            .patch { background-color: var(--warning-color); }
+            .delete { background-color: var(--danger-color); }
+            
+            .footer {
+                text-align: center;
+                padding: 1.5rem;
+                color: var(--secondary-color);
+                font-size: 0.875rem;
+            }
+            
+            .footer a {
+                color: var(--primary-color);
+                text-decoration: none;
+            }
+            
+            .footer a:hover {
+                text-decoration: underline;
+            }
+            
+            @media (max-width: 768px) {
+                .container {
+                    padding: 1rem;
+                }
+                
+                header {
+                    padding: 2rem 1rem;
+                }
+                
+                .endpoint-list {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>API Documentation</h1>
+                <p>Dokumentasi lengkap untuk menggunakan API kami</p>
+                <span class="version">{$version}</span>
+            </header>
+
+            <div class="content">
+                <div class="section">
+                    <h2>Daftar Endpoint</h2>
+                    <p>Berikut adalah daftar semua endpoint yang tersedia di API, dikelompokkan berdasarkan kategori:</p>
+                    
+                    {$routesHtml}
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>&copy; {$year} API Documentation. Dibuat dengan ❤️ & Gabut.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    HTML;
+    
+    return response($html);
 });
 
 // Auth Routes
