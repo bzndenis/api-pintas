@@ -25,6 +25,9 @@ $router->get('/', function () use ($router) {
         ];
     }
     
+    // Dapatkan base URL aplikasi
+    $baseUrl = url('/');
+    
     // Kelompokkan routes berdasarkan prefix
     $groupedRoutes = [];
     foreach ($routes as $route) {
@@ -54,6 +57,7 @@ $router->get('/', function () use ($router) {
             $methodClass = strtolower($method);
             $uri = $route['uri'];
             $action = $route['action'];
+            $fullUrl = $baseUrl . '/' . ltrim($uri, '/');
             
             $routesHtml .= "
             <div class='endpoint-card'>
@@ -64,6 +68,16 @@ $router->get('/', function () use ($router) {
                 <div class='endpoint-body'>
                     <div class='action-label'>Controller Action:</div>
                     <div class='action-value'>{$action}</div>
+                    <div class='url-label'>Contoh URL:</div>
+                    <div class='url-value'>
+                        <code>{$fullUrl}</code>
+                        <button class='copy-btn' onclick='copyToClipboard(this)' data-url='{$fullUrl}'>
+                            <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                                <rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect>
+                                <path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>";
         }
@@ -249,13 +263,14 @@ $router->get('/', function () use ($router) {
                 word-break: break-all;
             }
             
-            .action-label {
+            .action-label, .url-label {
                 font-size: 0.75rem;
                 color: var(--secondary-color);
                 margin-bottom: 0.25rem;
+                margin-top: 0.75rem;
             }
             
-            .action-value {
+            .action-value, .url-value {
                 font-family: monospace;
                 font-size: 0.8125rem;
                 color: var(--dark-color);
@@ -263,6 +278,32 @@ $router->get('/', function () use ($router) {
                 padding: 0.5rem;
                 border-radius: 0.25rem;
                 word-break: break-all;
+                position: relative;
+            }
+            
+            .url-value {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .copy-btn {
+                background: none;
+                border: none;
+                color: var(--secondary-color);
+                cursor: pointer;
+                padding: 0.25rem;
+                border-radius: 0.25rem;
+                transition: all 0.2s;
+            }
+            
+            .copy-btn:hover {
+                color: var(--primary-color);
+                background-color: rgba(59, 130, 246, 0.1);
+            }
+            
+            .copy-btn.copied {
+                color: var(--success-color);
             }
             
             .get { background-color: var(--primary-color); }
@@ -323,6 +364,28 @@ $router->get('/', function () use ($router) {
                 <p>&copy; {$year} API Documentation. Dibuat dengan ❤️ & Gabut.</p>
             </div>
         </div>
+        
+        <script>
+            function copyToClipboard(button) {
+                const url = button.getAttribute('data-url');
+                navigator.clipboard.writeText(url).then(() => {
+                    button.classList.add('copied');
+                    
+                    // Tampilkan efek visual bahwa URL telah disalin
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    `;
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                        button.classList.remove('copied');
+                    }, 2000);
+                });
+            }
+        </script>
     </body>
     </html>
     HTML;
