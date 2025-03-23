@@ -6,6 +6,7 @@ use App\Models\Kelas;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class KelasController extends BaseAdminController
 {
@@ -74,6 +75,41 @@ class KelasController extends BaseAdminController
             return ResponseBuilder::success(200, "Berhasil mengupdate kelas", $kelas);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $kelas = Kelas::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$kelas) {
+                return ResponseBuilder::error(404, "Data kelas tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah kelas masih memiliki siswa
+            if ($kelas->siswa()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus kelas yang masih memiliki siswa");
+            }
+            
+            // Cek apakah kelas masih memiliki jadwal
+            if ($kelas->jadwal()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus kelas yang masih memiliki jadwal");
+            }
+            
+            // Hapus kelas
+            $kelas->delete();
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data kelas");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 

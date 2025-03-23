@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class SiswaController extends BaseAdminController
 {
@@ -117,6 +118,49 @@ class SiswaController extends BaseAdminController
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal mengimport data: " . $e->getMessage());
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $siswa = Siswa::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$siswa) {
+                return ResponseBuilder::error(404, "Data siswa tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah siswa masih memiliki nilai
+            if ($siswa->nilai()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus siswa yang masih memiliki data nilai");
+            }
+            
+            // Cek apakah siswa masih memiliki absensi
+            if ($siswa->absensi()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus siswa yang masih memiliki data absensi");
+            }
+            
+            // Hapus user yang terkait jika ada
+            if ($siswa->user_id) {
+                $user = User::find($siswa->user_id);
+                if ($user) {
+                    $user->delete();
+                }
+            }
+            
+            // Hapus siswa
+            $siswa->delete();
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data siswa");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 

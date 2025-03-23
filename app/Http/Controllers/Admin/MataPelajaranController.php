@@ -6,6 +6,7 @@ use App\Models\MataPelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class MataPelajaranController extends BaseAdminController
 {
@@ -63,6 +64,41 @@ class MataPelajaranController extends BaseAdminController
             return ResponseBuilder::success(200, "Berhasil mengupdate mata pelajaran", $mapel);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $mapel = MataPelajaran::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$mapel) {
+                return ResponseBuilder::error(404, "Data mata pelajaran tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah mata pelajaran masih digunakan oleh guru
+            if ($mapel->guru()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih diajarkan oleh guru");
+            }
+            
+            // Cek apakah mata pelajaran masih digunakan oleh capaian pembelajaran
+            if ($mapel->capaianPembelajaran()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih memiliki capaian pembelajaran");
+            }
+            
+            // Hapus mata pelajaran
+            $mapel->delete();
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data mata pelajaran");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 

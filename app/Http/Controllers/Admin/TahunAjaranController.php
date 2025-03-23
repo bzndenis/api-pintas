@@ -91,4 +91,34 @@ class TahunAjaranController extends BaseAdminController
             return ResponseBuilder::error(500, "Gagal mengaktifkan tahun ajaran: " . $e->getMessage());
         }
     }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $tahunAjaran = TahunAjaran::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$tahunAjaran) {
+                return ResponseBuilder::error(404, "Data tahun ajaran tidak ditemukan");
+            }
+            
+            // Cek apakah tahun ajaran sedang aktif
+            if ($tahunAjaran->is_active) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus tahun ajaran yang sedang aktif");
+            }
+            
+            // Cek apakah tahun ajaran masih digunakan oleh kelas
+            if ($tahunAjaran->kelas()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus tahun ajaran yang masih digunakan oleh kelas");
+            }
+            
+            // Hapus tahun ajaran
+            $tahunAjaran->delete();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data tahun ajaran");
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+        }
+    }
 } 

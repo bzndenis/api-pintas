@@ -6,6 +6,7 @@ use App\Models\TujuanPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class TujuanPembelajaranController extends BaseAdminController
 {
@@ -63,6 +64,38 @@ class TujuanPembelajaranController extends BaseAdminController
             return ResponseBuilder::success(200, "Berhasil mengupdate tujuan pembelajaran", $tp);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $tp = TujuanPembelajaran::whereHas('capaianPembelajaran.mataPelajaran', function($q) use ($admin) {
+                $q->where('sekolah_id', $admin->sekolah_id);
+            })->find($id);
+            
+            if (!$tp) {
+                return ResponseBuilder::error(404, "Data tujuan pembelajaran tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah tujuan pembelajaran masih digunakan oleh nilai
+            if ($tp->nilai()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus tujuan pembelajaran yang masih memiliki data nilai");
+            }
+            
+            // Hapus tujuan pembelajaran
+            $tp->delete();
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data tujuan pembelajaran");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 

@@ -6,6 +6,7 @@ use App\Models\CapaianPembelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CapaianPembelajaranController extends BaseAdminController
 {
@@ -63,6 +64,38 @@ class CapaianPembelajaranController extends BaseAdminController
             return ResponseBuilder::success(200, "Berhasil mengupdate capaian pembelajaran", $cp);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $cp = CapaianPembelajaran::whereHas('mataPelajaran', function($q) use ($admin) {
+                $q->where('sekolah_id', $admin->sekolah_id);
+            })->find($id);
+            
+            if (!$cp) {
+                return ResponseBuilder::error(404, "Data capaian pembelajaran tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah capaian pembelajaran masih digunakan oleh tujuan pembelajaran
+            if ($cp->tujuanPembelajaran()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus capaian pembelajaran yang masih memiliki tujuan pembelajaran");
+            }
+            
+            // Hapus capaian pembelajaran
+            $cp->delete();
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data capaian pembelajaran");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 

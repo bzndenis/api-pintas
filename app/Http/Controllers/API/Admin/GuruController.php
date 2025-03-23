@@ -1,17 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\API\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Guru;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Str;
 
@@ -41,7 +39,9 @@ class GuruController extends Controller
                 $query->where('nip', 'like', '%' . $request->nip . '%');
             }
             
-            $guru = $query->orderBy('created_at', 'desc')->get();
+            // Pagination
+            $perPage = $request->per_page ?? 10;
+            $guru = $query->orderBy('created_at', 'desc')->paginate($perPage);
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data guru", $guru);
         } catch (\Exception $e) {
@@ -103,6 +103,25 @@ class GuruController extends Controller
         }
     }
 
+    public function show($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $guru = Guru::with(['user', 'mataPelajaran'])
+                ->where('sekolah_id', $admin->sekolah_id)
+                ->find($id);
+            
+            if (!$guru) {
+                return ResponseBuilder::error(404, "Data guru tidak ditemukan");
+            }
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan detail guru", $guru);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
     public function update(Request $request, $id)
     {
         $this->validate($request, [
@@ -158,10 +177,48 @@ class GuruController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+        try {
+            $admin = Auth::user();
+            
+            $guru = Guru::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$guru) {
+                return ResponseBuilder::error(404, "Data guru tidak ditemukan");
+            }
+            
+            DB::beginTransaction();
+            
+            // Cek apakah guru masih memiliki kelas
+            if ($guru->kelas()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih mengajar kelas");
+            }
+            
+            // Hapus data guru dan user terkait
+            if ($guru->user_id) {
+                $user = User::find($guru->user_id);
+                if ($user) {
+                    $user->delete();
+                }
+            } else {
+                // Hapus guru jika tidak terkait dengan user
+                $guru->delete();
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data guru");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+        }
+    }
+
     public function import(Request $request)
     {
         $this->validate($request, [
-            'file' => 'required|file|mimes:xlsx,xls|max:2048',
+            'file' => 'required|file|mimes:xlsx,xls,csv'
         ]);
 
         try {
@@ -170,12 +227,12 @@ class GuruController extends Controller
             $admin = Auth::user();
             $file = $request->file('file');
             
-            // Load spreadsheet
+            // Baca file Excel
             $spreadsheet = IOFactory::load($file->getPathname());
             $worksheet = $spreadsheet->getActiveSheet();
             $rows = $worksheet->toArray();
             
-            // Hapus header (baris pertama)
+            // Hapus header
             array_shift($rows);
             
             $imported = 0;
@@ -183,34 +240,26 @@ class GuruController extends Controller
             $importedData = [];
             
             foreach ($rows as $index => $row) {
-                // Skip baris kosong
-                if (empty($row[0]) && empty($row[1]) && empty($row[2])) {
-                    continue;
-                }
-                
-                $rowNumber = $index + 2; // +2 karena index dimulai dari 0 dan header di baris 1
-                
                 // Validasi data
-                $nama = trim($row[0] ?? '');
-                $nip = trim($row[1] ?? '');
-                $email = trim($row[2] ?? '');
-                $noTelp = trim($row[3] ?? '');
-                
-                // Validasi email
-                if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $errors[] = "Baris $rowNumber: Format email tidak valid";
+                if (empty($row[0]) || empty($row[2])) {
+                    $errors[] = "Baris " . ($index + 2) . ": Nama dan Email wajib diisi";
                     continue;
                 }
+                
+                $nama = $row[0];
+                $nip = $row[1] ?? null;
+                $email = $row[2];
+                $no_telp = $row[3] ?? null;
                 
                 // Cek apakah email sudah terdaftar
                 if (User::where('email', $email)->exists()) {
-                    $errors[] = "Baris $rowNumber: Email $email sudah terdaftar";
+                    $errors[] = "Baris " . ($index + 2) . ": Email $email sudah terdaftar";
                     continue;
                 }
                 
                 // Cek apakah NIP sudah terdaftar (jika ada)
-                if (!empty($nip) && Guru::where('nip', $nip)->where('sekolah_id', $admin->sekolah_id)->exists()) {
-                    $errors[] = "Baris $rowNumber: NIP $nip sudah terdaftar";
+                if ($nip && Guru::where('nip', $nip)->where('sekolah_id', $admin->sekolah_id)->exists()) {
+                    $errors[] = "Baris " . ($index + 2) . ": NIP $nip sudah terdaftar";
                     continue;
                 }
                 
@@ -225,7 +274,7 @@ class GuruController extends Controller
                     'is_active' => true,
                     'sekolah_id' => $admin->sekolah_id,
                     'nama_lengkap' => $nama,
-                    'no_telepon' => $noTelp
+                    'no_telepon' => $no_telp
                 ]);
                 
                 // Buat data guru
@@ -233,13 +282,12 @@ class GuruController extends Controller
                     'nama' => $nama,
                     'nip' => $nip,
                     'email' => $email,
-                    'no_telp' => $noTelp,
+                    'no_telp' => $no_telp,
                     'user_id' => $user->id,
                     'sekolah_id' => $admin->sekolah_id
                 ]);
                 
                 $importedData[] = [
-                    'id' => $guru->id,
                     'nama' => $nama,
                     'nip' => $nip,
                     'email' => $email,
@@ -259,52 +307,6 @@ class GuruController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal mengimpor data: " . $e->getMessage());
-        }
-    }
-
-    public function destroy($id)
-    {
-        try {
-            $admin = Auth::user();
-            
-            $guru = Guru::where('sekolah_id', $admin->sekolah_id)->find($id);
-            
-            if (!$guru) {
-                return ResponseBuilder::error(404, "Data guru tidak ditemukan");
-            }
-            
-            // Hapus data guru dan user terkait
-            $guru->user->delete();
-            
-            return ResponseBuilder::success(200, "Berhasil menghapus data guru");
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
-        }
-    }
-
-    public function resetPassword(Request $request, $id)
-    {
-        $this->validate($request, [
-            'new_password' => 'required|string|min:6'
-        ]);
-
-        try {
-            $admin = Auth::user();
-            
-            $guru = Guru::where('sekolah_id', $admin->sekolah_id)->find($id);
-            
-            if (!$guru) {
-                return ResponseBuilder::error(404, "Data guru tidak ditemukan");
-            }
-            
-            // Update password
-            $guru->user->update([
-                'password' => Hash::make($request->new_password)
-            ]);
-            
-            return ResponseBuilder::success(200, "Berhasil mereset password guru");
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal mereset password: " . $e->getMessage());
         }
     }
 
