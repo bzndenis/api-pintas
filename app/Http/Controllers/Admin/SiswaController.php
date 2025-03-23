@@ -8,6 +8,8 @@ use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 
 class SiswaController extends BaseAdminController
 {
@@ -161,6 +163,92 @@ class SiswaController extends BaseAdminController
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+        }
+    }
+
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'siswa' => 'required|array|min:1',
+            'siswa.*.nama' => 'required|string|max:255',
+            'siswa.*.nis' => 'required|string|unique:siswa,nis',
+            'siswa.*.nisn' => 'nullable|string|unique:siswa,nisn',
+            'siswa.*.jenis_kelamin' => 'required|in:L,P',
+            'siswa.*.kelas_id' => 'required|exists:kelas,id'
+        ]);
+
+        try {
+            $admin = Auth::user();
+            $siswaData = $request->siswa;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            DB::beginTransaction();
+            
+            foreach ($siswaData as $index => $data) {
+                try {
+                    // Generate password
+                    $password = Str::random(8);
+                    
+                    // Buat user baru jika email disediakan
+                    $userId = null;
+                    if (isset($data['email']) && !empty($data['email'])) {
+                        $user = User::create([
+                            'name' => $data['nama'],
+                            'email' => $data['email'],
+                            'password' => Hash::make($password),
+                            'role' => 'siswa',
+                            'sekolah_id' => $admin->sekolah_id
+                        ]);
+                        $userId = $user->id;
+                    }
+                    
+                    // Buat data siswa
+                    $siswa = Siswa::create([
+                        'nama' => $data['nama'],
+                        'nis' => $data['nis'],
+                        'nisn' => $data['nisn'] ?? null,
+                        'jenis_kelamin' => $data['jenis_kelamin'],
+                        'tempat_lahir' => $data['tempat_lahir'] ?? null,
+                        'tanggal_lahir' => $data['tanggal_lahir'] ?? null,
+                        'alamat' => $data['alamat'] ?? null,
+                        'nama_ortu' => $data['nama_ortu'] ?? null,
+                        'no_telp_ortu' => $data['no_telp_ortu'] ?? null,
+                        'kelas_id' => $data['kelas_id'],
+                        'user_id' => $userId,
+                        'sekolah_id' => $admin->sekolah_id
+                    ]);
+                    
+                    $importedData[] = [
+                        'id' => $siswa->id,
+                        'nama' => $data['nama'],
+                        'nis' => $data['nis'],
+                        'nisn' => $data['nisn'] ?? null,
+                        'kelas_id' => $data['kelas_id'],
+                        'password' => $userId ? $password : null
+                    ];
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'nama' => $data['nama'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data siswa", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
         }
     }
 } 

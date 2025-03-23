@@ -21,15 +21,49 @@ class LoginMiddleware
 {
     public function handle($request, Closure $next)
     {
-        $token = str_replace('Bearer ', '', $request->header('Authorization'));
+        // Dapatkan token dari header Authorization
+        $token = $request->header('Authorization');
         
-        if (!$token) {
+        // Log token asli untuk debugging
+        \Log::info('Token asli dari header: ' . $token);
+        
+        // Hapus 'Bearer ' dari token jika ada
+        if (strpos($token, 'Bearer ') === 0) {
+            $token = substr($token, 7);
+        }
+        
+        // Log token setelah diproses
+        \Log::info('Token setelah diproses: ' . $token);
+        
+        if (empty($token)) {
             return ResponseBuilder::error(401, "Token tidak ditemukan");
         }
 
+        // Coba cari user dengan token yang sudah diproses
         $user = User::where('remember_token', $token)->first();
         
+        // Jika tidak ditemukan, coba cari dengan token asli (mungkin ada masalah dengan format)
+        if (!$user && $request->header('Authorization')) {
+            $originalToken = $request->header('Authorization');
+            \Log::info('Mencoba dengan token asli: ' . $originalToken);
+            $user = User::where('remember_token', $originalToken)->first();
+        }
+        
+        // Jika masih tidak ditemukan, coba cari dengan token yang ditambahkan 'Bearer '
         if (!$user) {
+            $bearerToken = 'Bearer ' . $token;
+            \Log::info('Mencoba dengan token + Bearer: ' . $bearerToken);
+            $user = User::where('remember_token', $bearerToken)->first();
+        }
+        
+        if (!$user) {
+            // Log untuk debugging
+            \Log::info('Token tidak valid: ' . $token);
+            
+            // Log semua token yang ada di database untuk perbandingan
+            $allTokens = User::whereNotNull('remember_token')->pluck('remember_token')->toArray();
+            \Log::info('Token yang ada di database: ', $allTokens);
+            
             return ResponseBuilder::error(401, "Token tidak valid");
         }
 

@@ -101,4 +101,65 @@ class MataPelajaranController extends BaseAdminController
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
+
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'mapel' => 'required|array|min:1',
+            'mapel.*.nama' => 'required|string|max:255',
+            'mapel.*.kode' => 'required|string|max:50',
+            'mapel.*.tingkat' => 'required|string|max:50',
+            'mapel.*.guru_id' => 'nullable|exists:guru,id'
+        ]);
+
+        try {
+            $admin = Auth::user();
+            $mapelData = $request->mapel;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            DB::beginTransaction();
+            
+            foreach ($mapelData as $index => $data) {
+                try {
+                    // Buat data mata pelajaran
+                    $mapel = MataPelajaran::create([
+                        'nama' => $data['nama'],
+                        'kode' => $data['kode'],
+                        'tingkat' => $data['tingkat'],
+                        'guru_id' => $data['guru_id'] ?? null,
+                        'sekolah_id' => $admin->sekolah_id
+                    ]);
+                    
+                    $importedData[] = [
+                        'id' => $mapel->id,
+                        'nama' => $data['nama'],
+                        'kode' => $data['kode'],
+                        'tingkat' => $data['tingkat'],
+                        'guru_id' => $data['guru_id'] ?? null
+                    ];
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'nama' => $data['nama'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data mata pelajaran", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
+        }
+    }
 } 

@@ -417,6 +417,7 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
         // Mata Pelajaran
         $router->get('/mapel', 'Admin\MataPelajaranController@index');
         $router->post('/mapel', 'Admin\MataPelajaranController@store');
+        $router->post('/mapel/batch', 'Admin\MataPelajaranController@storeBatch');
         $router->put('/mapel/{id}', 'Admin\MataPelajaranController@update');
         $router->delete('/mapel/{id}', 'Admin\MataPelajaranController@destroy');
         
@@ -436,6 +437,7 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
     // Manajemen Guru
     $router->get('/guru', 'Admin\GuruController@index');
     $router->post('/guru', 'Admin\GuruController@store');
+    $router->post('/guru/batch', 'Admin\GuruController@storeBatch');
     $router->put('/guru/{id}', 'Admin\GuruController@update');
     $router->delete('/guru/{id}', 'Admin\GuruController@destroy');
     $router->post('/guru/import', 'Admin\GuruController@import');
@@ -445,6 +447,7 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
     // Manajemen Siswa
     $router->get('/siswa', 'Admin\SiswaController@index');
     $router->post('/siswa', 'Admin\SiswaController@store');
+    $router->post('/siswa/batch', 'Admin\SiswaController@storeBatch');
     $router->put('/siswa/{id}', 'Admin\SiswaController@update');
     $router->delete('/siswa/{id}', 'Admin\SiswaController@destroy');
     $router->post('/siswa/import', 'Admin\SiswaController@import');
@@ -464,10 +467,33 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
     // $router->get('/settings', 'Admin\SettingController@index');
     // $router->post('/settings', 'Admin\SettingController@store');
     // $router->put('/settings/{id}', 'Admin\SettingController@update');
+
+    // Guru Routes
+    $router->group(['prefix' => 'guru'], function () use ($router) {
+        // Route statis terlebih dahulu
+        $router->get('/template', 'Admin\GuruController@getTemplate');
+        $router->post('/batch', 'Admin\GuruController@storeBatch');
+        
+        // Route lainnya...
+    });
 });
 
 // Guru Routes
 $router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
+    // Absensi Controller Routes
+    $router->group(['prefix' => 'absensi'], function () use ($router) {
+        // Route statis terlebih dahulu
+        $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
+        $router->get('/export', 'Guru\AbsensiController@export');
+        $router->get('/laporan', 'Guru\AbsensiController@laporan');
+        $router->post('/import', 'Guru\AbsensiController@import');
+        
+        // Route variabel setelahnya
+        $router->get('/{id}', 'Guru\AbsensiController@show');
+        $router->put('/{id}', 'Guru\AbsensiController@update');
+        $router->delete('/{id}', 'Guru\AbsensiController@destroy');
+    });
+    
     // Dashboard
     $router->get('/dashboard', 'Guru\DashboardController@index');
     
@@ -482,12 +508,7 @@ $router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function
     $router->group(['prefix' => 'absensi'], function () use ($router) {
         $router->get('/', 'Guru\AbsensiController@index');
         $router->post('/', 'Guru\AbsensiController@store');
-        $router->get('/{id}', 'Guru\AbsensiController@show');
-        $router->put('/{id}', 'Guru\AbsensiController@update');
-        $router->delete('/{id}', 'Guru\AbsensiController@destroy');
         $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
-        $router->get('/export', 'Guru\AbsensiController@export');
-        $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
     });
     
     // Rekap Routes
@@ -688,16 +709,41 @@ $router->group(['prefix' => 'api/guru', 'middleware' => 'login'], function () us
     $router->get('/dashboard/activities', 'API\GuruController@getRecentActivities');
 });
 
-// API Mobile - Admin Routes
+// API Admin Routes
 $router->group(['prefix' => 'api/admin', 'middleware' => ['login', 'admin']], function () use ($router) {
-    // Guru Management
-    $router->get('/guru', 'API\Admin\GuruController@index');
-    $router->post('/guru', 'API\Admin\GuruController@store');
-    $router->get('/guru/{id}', 'API\Admin\GuruController@show');
-    $router->put('/guru/{id}', 'API\Admin\GuruController@update');
-    $router->delete('/guru/{id}', 'API\Admin\GuruController@destroy');
-    $router->post('/guru/import', 'API\Admin\GuruController@import');
-    $router->get('/guru/template', 'API\Admin\GuruController@getTemplate');
+    // Guru Routes
+    $router->group(['prefix' => 'guru'], function () use ($router) {
+        // Route statis terlebih dahulu
+        $router->get('/template', 'API\Admin\GuruController@getTemplate');
+        $router->post('/batch', 'API\Admin\GuruController@storeBatch');
+        
+        // Route dasar
+        $router->get('/', 'API\Admin\GuruController@index');
+        $router->post('/', 'API\Admin\GuruController@store');
+        
+        // Route variabel
+        $router->get('/{id}', 'API\Admin\GuruController@show');
+        $router->put('/{id}', 'API\Admin\GuruController@update');
+        $router->delete('/{id}', 'API\Admin\GuruController@destroy');
+    });
+    
+    // Siswa Routes
+    $router->group(['prefix' => 'siswa'], function () use ($router) {
+        // Route statis terlebih dahulu
+        $router->get('/template', 'API\Admin\SiswaController@getTemplate');
+        $router->post('/batch', 'API\Admin\SiswaController@storeBatch');
+        
+        // Route dasar
+        $router->get('/', 'API\Admin\SiswaController@index');
+        $router->post('/', 'API\Admin\SiswaController@store');
+        
+        // Route variabel setelahnya
+        $router->get('/{id}', 'API\Admin\SiswaController@show');
+        $router->put('/{id}', 'API\Admin\SiswaController@update');
+        $router->delete('/{id}', 'API\Admin\SiswaController@destroy');
+    });
+    
+    // Route lainnya...
 });
 
 // Admin Routes
@@ -707,6 +753,8 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
     $router->post('/sekolah', 'Admin\SekolahController@store');
     $router->put('/sekolah/{id}', 'Admin\SekolahController@update');
     $router->delete('/sekolah/{id}', 'Admin\SekolahController@destroy');
+    $router->get('/batch', 'Admin\GuruController@batchForm');
+    $router->post('/batch', 'Admin\GuruController@storeBatch');
 });
 
 // Setting Routes

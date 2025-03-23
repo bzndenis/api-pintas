@@ -19,8 +19,8 @@ class GuruController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('login');
-        $this->middleware('admin');
+        // Middleware sudah diterapkan di level route, jadi tidak perlu di sini
+        // Atau pastikan konsisten dengan yang di route
     }
 
     public function index(Request $request)
@@ -55,7 +55,7 @@ class GuruController extends Controller
             'nama' => 'required|string|max:255',
             'nip' => 'nullable|string|unique:guru,nip',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
+            'password' => 'nullable|string|min:6',
             'no_telp' => 'nullable|string|max:20',
             'mata_pelajaran' => 'nullable|array',
             'mata_pelajaran.*' => 'exists:mata_pelajaran,id'
@@ -65,11 +65,14 @@ class GuruController extends Controller
             DB::beginTransaction();
 
             $admin = Auth::user();
+            
+            // Gunakan password default jika tidak ada input password
+            $password = $request->password ?? '1234';
 
             // Buat user account
             $user = User::create([
                 'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'password' => Hash::make($password),
                 'role' => 'guru',
                 'is_active' => true,
                 'sekolah_id' => $admin->sekolah_id,
@@ -273,11 +276,34 @@ class GuruController extends Controller
                 return ResponseBuilder::error(404, "Data guru tidak ditemukan");
             }
             
-            // Hapus data guru dan user terkait
-            $guru->user->delete();
+            DB::beginTransaction();
+            
+            // Cek apakah guru masih memiliki kelas sebagai wali kelas
+            if ($guru->kelasWali()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih menjadi wali kelas");
+            }
+            
+            // Cek apakah guru masih mengajar mata pelajaran
+            if ($guru->jadwalMengajar()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih memiliki jadwal mengajar");
+            }
+            
+            // Hapus user yang terkait jika ada
+            if ($guru->user_id) {
+                $user = User::find($guru->user_id);
+                if ($user) {
+                    $user->delete();
+                }
+            }
+            
+            // Hapus guru
+            $guru->delete();
+            
+            DB::commit();
             
             return ResponseBuilder::success(200, "Berhasil menghapus data guru");
         } catch (\Exception $e) {
+            DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
@@ -344,6 +370,115 @@ class GuruController extends Controller
             ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal membuat template: " . $e->getMessage());
+        }
+    }
+
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'guru' => 'required|array|min:1',
+            'guru.*.nama' => 'required|string|max:255',
+            'guru.*.nip' => 'nullable|string|unique:guru,nip',
+            'guru.*.email' => 'required|email|unique:users,email',
+            'guru.*.no_telp' => 'nullable|string|max:15',
+            'guru.*.kelas' => 'nullable|string|max:255'
+        ]);
+
+        try {
+            $admin = Auth::user();
+            \Log::info('Admin yang melakukan import: ', ['id' => $admin->id, 'sekolah_id' => $admin->sekolah_id]);
+            
+            $guruData = $request->guru;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            // Nonaktifkan foreign key check sementara
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            DB::beginTransaction();
+            
+            foreach ($guruData as $index => $data) {
+                try {
+                    // Log data yang akan diproses
+                    \Log::info('Processing guru data: ', $data);
+                    
+                    // Gunakan password default 1234
+                    $password = '1234';
+                    
+                    // Buat UUID untuk user
+                    $userId = (string) Str::uuid();
+                    
+                    // Buat user langsung dengan DB::table
+                    DB::table('users')->insert([
+                        'id' => $userId,
+                        'email' => $data['email'],
+                        'password' => Hash::make($password),
+                        'role' => 'guru',
+                        'is_active' => true,
+                        'sekolah_id' => $admin->sekolah_id,
+                        'nama_lengkap' => $data['nama'],
+                        'no_telepon' => $data['no_telp'] ?? null,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ]);
+                    
+                    \Log::info('User created with ID: ' . $userId);
+                    
+                    // Buat UUID untuk guru
+                    $guruId = (string) Str::uuid();
+                    
+                    // Buat data guru langsung dengan DB::table
+                    DB::table('guru')->insert([
+                        'id' => $guruId,
+                        'nama' => $data['nama'],
+                        'nip' => $data['nip'] ?? null,
+                        'email' => $data['email'],
+                        'no_telp' => $data['no_telp'] ?? null,
+                        'user_id' => $userId,
+                        'sekolah_id' => $admin->sekolah_id,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ]);
+                    
+                    \Log::info('Guru created with ID: ' . $guruId);
+                    
+                    $importedData[] = [
+                        'id' => $guruId,
+                        'nama' => $data['nama'],
+                        'nip' => $data['nip'] ?? null,
+                        'email' => $data['email'],
+                        'password' => $password // Tampilkan password default
+                    ];
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    \Log::error('Error creating guru: ' . $e->getMessage());
+                    \Log::error('Stack trace: ' . $e->getTraceAsString());
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'nama' => $data['nama'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            // Aktifkan kembali foreign key check
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data guru", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            // Pastikan foreign key check diaktifkan kembali jika terjadi error
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            
+            \Log::error('Batch error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
         }
     }
 } 
