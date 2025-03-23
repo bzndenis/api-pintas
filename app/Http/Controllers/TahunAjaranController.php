@@ -1,154 +1,131 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Models\TahunAjaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
-class TahunAjaranController extends Controller
+class TahunAjaranController extends BaseAdminController
 {
-    public function __construct()
-    {
-        $this->middleware("login");
-    }
-
-    public function index(Request $request)
+    public function index()
     {
         try {
-            $query = TahunAjaran::query();
+            $tahunAjaran = TahunAjaran::where('sekolah_id', Auth::user()->sekolah_id)
+                ->orderBy('tanggal_mulai', 'desc')
+                ->get();
             
-            if ($request->has('active')) {
-                $query->where('is_active', $request->active);
-            }
-
-            $tahunAjaran = $query->orderBy('tahun_mulai', 'desc')->get();
-
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $tahunAjaran);
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data tahun ajaran", $tahunAjaran);
         } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
     }
 
     public function store(Request $request)
     {
+        $this->validate($request, [
+            'nama_tahun_ajaran' => 'required|string|max:255',
+            'tanggal_mulai' => 'required|date',
+            'tanggal_selesai' => 'required|date|after:tanggal_mulai'
+        ]);
+
         try {
-            DB::beginTransaction();
-
-            $tahunAjaran = TahunAjaran::create([
-                'tahun_mulai' => $request->tahun_mulai,
-                'tahun_selesai' => $request->tahun_selesai,
-                'semester' => $request->semester,
-                'is_active' => $request->is_active ?? false
-            ]);
-
-            if ($request->is_active) {
-                // Nonaktifkan tahun ajaran lain
-                TahunAjaran::where('id', '!=', $tahunAjaran->id)
-                    ->update(['is_active' => false]);
-            }
-
-            DB::commit();
-            return ResponseBuilder::success(200, "Berhasil menambah data", $tahunAjaran);
+            $data = $request->all();
+            $data['sekolah_id'] = Auth::user()->sekolah_id;
+            
+            $tahunAjaran = TahunAjaran::create($data);
+            
+            return ResponseBuilder::success(201, "Berhasil menambahkan tahun ajaran", $tahunAjaran);
         } catch (\Exception $e) {
-            DB::rollback();
-            return ResponseBuilder::error(500, "Gagal menambah data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
         }
-    }
-
-    public function show($id)
-    {
-        $tahunAjaran = TahunAjaran::with('sekolah')->find($id);
-        
-        if (!$tahunAjaran) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $tahunAjaran, true);
     }
 
     public function update(Request $request, $id)
     {
-        $tahunAjaran = TahunAjaran::find($id);
-        
-        if (!$tahunAjaran) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
         $this->validate($request, [
-            'nama_tahun_ajaran' => 'sometimes|required|string|max:255',
-            'tanggal_mulai' => 'sometimes|required|date',
-            'tanggal_selesai' => 'sometimes|required|date|after:tanggal_mulai',
-            'sekolah_id' => 'sometimes|required|exists:sekolah,id',
-            'is_active' => 'nullable|boolean'
+            'nama_tahun_ajaran' => 'required|string|max:255',
+            'tanggal_mulai' => 'required|date',
+            'tanggal_selesai' => 'required|date|after:tanggal_mulai'
         ]);
-        
+
         try {
-            DB::beginTransaction();
+            $tahunAjaran = TahunAjaran::where('sekolah_id', Auth::user()->sekolah_id)
+                ->find($id);
             
-            // Jika tahun ajaran diaktifkan, nonaktifkan tahun ajaran yang lain
-            if ($request->has('is_active') && $request->is_active) {
-                TahunAjaran::where('sekolah_id', $tahunAjaran->sekolah_id)
-                          ->where('id', '!=', $id)
-                          ->where('is_active', true)
-                          ->update(['is_active' => false]);
+            if (!$tahunAjaran) {
+                return ResponseBuilder::error(404, "Tahun ajaran tidak ditemukan");
             }
             
             $tahunAjaran->update($request->all());
             
-            DB::commit();
-            
-            return ResponseBuilder::success(200, "Berhasil Mengubah Data", $tahunAjaran, true);
+            return ResponseBuilder::success(200, "Berhasil mengupdate tahun ajaran", $tahunAjaran);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal Mengubah Data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
+        }
+    }
+
+    public function activate($id)
+    {
+        try {
+            $sekolahId = Auth::user()->sekolah_id;
+            
+            // Cek apakah tahun ajaran yang dipilih sudah aktif
+            $tahunAjaran = TahunAjaran::where('sekolah_id', $sekolahId)
+                ->find($id);
+                
+            if (!$tahunAjaran) {
+                return ResponseBuilder::error(404, "Tahun ajaran tidak ditemukan");
+            }
+            
+            // Jika tahun ajaran sudah aktif, maka nonaktifkan
+            if ($tahunAjaran->is_active) {
+                $tahunAjaran->update(['is_active' => false]);
+                return ResponseBuilder::success(200, "Berhasil menonaktifkan tahun ajaran", $tahunAjaran);
+            }
+            
+            // Jika belum aktif, nonaktifkan semua tahun ajaran lain
+            TahunAjaran::where('sekolah_id', $sekolahId)
+                ->update(['is_active' => false]);
+            
+            // Aktifkan tahun ajaran yang dipilih
+            $tahunAjaran->update(['is_active' => true]);
+            
+            return ResponseBuilder::success(200, "Berhasil mengaktifkan tahun ajaran", $tahunAjaran);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mengubah status tahun ajaran: " . $e->getMessage());
         }
     }
 
     public function destroy($id)
     {
-        $tahunAjaran = TahunAjaran::find($id);
-        
-        if (!$tahunAjaran) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
         try {
-            // Cek apakah tahun ajaran masih memiliki kelas
-            if ($tahunAjaran->kelas()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus tahun ajaran yang masih memiliki kelas");
+            $admin = Auth::user();
+            
+            $tahunAjaran = TahunAjaran::where('sekolah_id', $admin->sekolah_id)->find($id);
+            
+            if (!$tahunAjaran) {
+                return ResponseBuilder::error(404, "Data tahun ajaran tidak ditemukan");
             }
             
-            $tahunAjaran->delete();
-            return ResponseBuilder::success(200, "Berhasil Menghapus Data", null, true);
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal Menghapus Data: " . $e->getMessage());
-        }
-    }
-    
-    public function activate($id)
-    {
-        try {
-            DB::beginTransaction();
-
-            $tahunAjaran = TahunAjaran::find($id);
-            if (!$tahunAjaran) {
-                return ResponseBuilder::error(404, "Data tidak ditemukan");
+            // Cek apakah tahun ajaran sedang aktif
+            if ($tahunAjaran->is_active) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus tahun ajaran yang sedang aktif");
             }
-
-            // Nonaktifkan semua tahun ajaran
-            TahunAjaran::query()->update(['is_active' => false]);
-
-            // Aktifkan tahun ajaran yang dipilih
-            $tahunAjaran->update(['is_active' => true]);
-
-            DB::commit();
-            return ResponseBuilder::success(200, "Berhasil mengaktifkan tahun ajaran", $tahunAjaran);
+            
+            // Cek apakah tahun ajaran masih digunakan oleh kelas
+            if ($tahunAjaran->kelas()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus tahun ajaran yang masih digunakan oleh kelas");
+            }
+            
+            // Hapus tahun ajaran
+            $tahunAjaran->delete();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus data tahun ajaran");
         } catch (\Exception $e) {
-            DB::rollback();
-            return ResponseBuilder::error(500, "Gagal mengaktifkan: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
 } 
