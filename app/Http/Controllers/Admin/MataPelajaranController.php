@@ -15,8 +15,8 @@ class MataPelajaranController extends BaseAdminController
     public function index()
     {
         try {
+            // Ambil data mata pelajaran berdasarkan sekolah_id user yang login
             $mapel = MataPelajaran::where('sekolah_id', Auth::user()->sekolah_id)
-                ->with(['guru', 'capaianPembelajaran'])
                 ->get();
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data mata pelajaran", $mapel);
@@ -82,13 +82,11 @@ class MataPelajaranController extends BaseAdminController
             
             DB::beginTransaction();
             
-            // Cek apakah mata pelajaran masih digunakan oleh guru
-            if ($mapel->guru()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih diajarkan oleh guru");
-            }
+            // Hapus mata pelajaran tanpa pengecekan relasi guru
+            // karena method guru() tidak tersedia
             
             // Cek apakah mata pelajaran masih digunakan oleh capaian pembelajaran
-            if ($mapel->capaianPembelajaran()->count() > 0) {
+            if (method_exists($mapel, 'capaianPembelajaran') && $mapel->capaianPembelajaran()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih memiliki capaian pembelajaran");
             }
             

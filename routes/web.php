@@ -13,6 +13,255 @@
 |
 */
 
+// Pindahkan fungsi-fungsi ini ke luar loop
+function getParametersFromUri($uri) {
+    $params = [];
+    $parts = explode('/', $uri);
+    
+    foreach ($parts as $part) {
+        if (strpos($part, '{') !== false && strpos($part, '}') !== false) {
+            $paramName = trim($part, '{}');
+            $params[] = [
+                'name' => $paramName,
+                'type' => 'path',
+                'required' => true,
+                'description' => 'ID atau nilai ' . str_replace('_', ' ', $paramName)
+            ];
+        }
+    }
+    
+    return $params;
+}
+
+function getEndpointUsageInfo($method, $uri, $baseUrl) {
+    $fullUrl = $baseUrl . '/' . ltrim($uri, '/');
+    $params = getParametersFromUri($uri);
+    
+    // Tambahkan informasi tipe data yang sesuai dengan model
+    foreach ($params as $key => $param) {
+        $paramName = $param['name'];
+        
+        // Sesuaikan tipe data berdasarkan nama parameter
+        if ($paramName === 'id' || strpos($paramName, '_id') !== false) {
+            $params[$key]['type'] = 'string (UUID)';
+            $params[$key]['description'] = 'UUID dari ' . str_replace(['_id', '_'], ['', ' '], $paramName);
+        }
+        
+        // Tambahkan informasi spesifik berdasarkan endpoint
+        if (strpos($uri, 'sekolah') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari sekolah';
+        } elseif (strpos($uri, 'guru') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari guru';
+        } elseif (strpos($uri, 'siswa') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari siswa';
+        } elseif (strpos($uri, 'kelas') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari kelas';
+        } elseif (strpos($uri, 'mapel') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari mata pelajaran';
+        } elseif (strpos($uri, 'cp') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari capaian pembelajaran';
+        } elseif (strpos($uri, 'tp') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari tujuan pembelajaran';
+        } elseif (strpos($uri, 'nilai') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari nilai siswa';
+        } elseif (strpos($uri, 'absensi') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari absensi siswa';
+        } elseif (strpos($uri, 'pertemuan') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari pertemuan bulanan';
+        } elseif (strpos($uri, 'tahun-ajaran') !== false && $paramName === 'id') {
+            $params[$key]['description'] = 'UUID dari tahun ajaran';
+        }
+    }
+    
+    $headers = [
+        ['name' => 'Accept', 'value' => 'application/json'],
+        ['name' => 'Content-Type', 'value' => 'application/json']
+    ];
+    
+    if (strpos($uri, 'auth/login') === false && strpos($uri, 'auth/register') === false) {
+        $headers[] = ['name' => 'Authorization', 'value' => 'Bearer {your_token}'];
+    }
+    
+    $bodyParams = [];
+    if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
+        // Tambahkan contoh body parameter berdasarkan URI
+        if (strpos($uri, 'auth/login') !== false) {
+            $bodyParams = [
+                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email pengguna'],
+                ['name' => 'password', 'type' => 'string', 'required' => true, 'description' => 'Password pengguna']
+            ];
+        } elseif (strpos($uri, 'auth/register') !== false) {
+            $bodyParams = [
+                ['name' => 'nama_lengkap', 'type' => 'string', 'required' => true, 'description' => 'Nama lengkap'],
+                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email pengguna'],
+                ['name' => 'password', 'type' => 'string', 'required' => true, 'description' => 'Password (min. 8 karakter)'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'user/change-password') !== false) {
+            $bodyParams = [
+                ['name' => 'current_password', 'type' => 'string', 'required' => true, 'description' => 'Password saat ini'],
+                ['name' => 'new_password', 'type' => 'string', 'required' => true, 'description' => 'Password baru'],
+                ['name' => 'new_password_confirmation', 'type' => 'string', 'required' => true, 'description' => 'Konfirmasi password baru']
+            ];
+        } elseif (strpos($uri, 'guru') !== false) {
+            $bodyParams = [
+                ['name' => 'nama', 'type' => 'string', 'required' => true, 'description' => 'Nama guru'],
+                ['name' => 'nip', 'type' => 'string', 'required' => false, 'description' => 'NIP guru'],
+                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email guru'],
+                ['name' => 'no_telp', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon guru'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'siswa') !== false) {
+            $bodyParams = [
+                ['name' => 'nama', 'type' => 'string', 'required' => true, 'description' => 'Nama siswa'],
+                ['name' => 'nis', 'type' => 'string', 'required' => true, 'description' => 'NIS siswa'],
+                ['name' => 'nisn', 'type' => 'string', 'required' => false, 'description' => 'NISN siswa'],
+                ['name' => 'jenis_kelamin', 'type' => 'enum', 'required' => true, 'description' => 'Jenis kelamin (L/P)'],
+                ['name' => 'tempat_lahir', 'type' => 'string', 'required' => true, 'description' => 'Tempat lahir'],
+                ['name' => 'tanggal_lahir', 'type' => 'date', 'required' => true, 'description' => 'Tanggal lahir (YYYY-MM-DD)'],
+                ['name' => 'alamat', 'type' => 'string', 'required' => false, 'description' => 'Alamat siswa'],
+                ['name' => 'nama_ortu', 'type' => 'string', 'required' => false, 'description' => 'Nama orang tua'],
+                ['name' => 'no_telp_ortu', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon orang tua'],
+                ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID kelas'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'mapel') !== false) {
+            $bodyParams = [
+                ['name' => 'kode_mapel', 'type' => 'string', 'required' => true, 'description' => 'Kode mata pelajaran'],
+                ['name' => 'nama_mapel', 'type' => 'string', 'required' => true, 'description' => 'Nama mata pelajaran'],
+                ['name' => 'tingkat', 'type' => 'string', 'required' => true, 'description' => 'Tingkat kelas (1-12)'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'cp') !== false) {
+            $bodyParams = [
+                ['name' => 'kode_cp', 'type' => 'string', 'required' => true, 'description' => 'Kode capaian pembelajaran'],
+                ['name' => 'deskripsi', 'type' => 'string', 'required' => true, 'description' => 'Deskripsi capaian pembelajaran'],
+                ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID mata pelajaran'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'tp') !== false) {
+            $bodyParams = [
+                ['name' => 'kode_tp', 'type' => 'string', 'required' => true, 'description' => 'Kode tujuan pembelajaran'],
+                ['name' => 'deskripsi', 'type' => 'string', 'required' => true, 'description' => 'Deskripsi tujuan pembelajaran'],
+                ['name' => 'bobot', 'type' => 'decimal', 'required' => true, 'description' => 'Bobot nilai (0-100)'],
+                ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID capaian pembelajaran'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'nilai') !== false) {
+            $bodyParams = [
+                ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID siswa'],
+                ['name' => 'tp_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID tujuan pembelajaran'],
+                ['name' => 'nilai', 'type' => 'decimal', 'required' => true, 'description' => 'Nilai (0-100)'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'pertemuan') !== false) {
+            $bodyParams = [
+                ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID kelas'],
+                ['name' => 'bulan', 'type' => 'integer', 'required' => true, 'description' => 'Bulan (1-12)'],
+                ['name' => 'tahun', 'type' => 'integer', 'required' => true, 'description' => 'Tahun (YYYY)'],
+                ['name' => 'total_pertemuan', 'type' => 'integer', 'required' => true, 'description' => 'Total pertemuan dalam bulan'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'absensi') !== false) {
+            $bodyParams = [
+                ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID siswa'],
+                ['name' => 'pertemuan_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID pertemuan bulanan'],
+                ['name' => 'hadir', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah kehadiran'],
+                ['name' => 'izin', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah izin'],
+                ['name' => 'sakit', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah sakit'],
+                ['name' => 'absen', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah absen tanpa keterangan'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'tahun-ajaran') !== false) {
+            $bodyParams = [
+                ['name' => 'nama_tahun_ajaran', 'type' => 'string', 'required' => true, 'description' => 'Nama tahun ajaran (contoh: 2023/2024)'],
+                ['name' => 'tanggal_mulai', 'type' => 'date', 'required' => true, 'description' => 'Tanggal mulai (YYYY-MM-DD)'],
+                ['name' => 'tanggal_selesai', 'type' => 'date', 'required' => true, 'description' => 'Tanggal selesai (YYYY-MM-DD)'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah'],
+                ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Status aktif (true/false)']
+            ];
+        } elseif (strpos($uri, 'kelas') !== false) {
+            $bodyParams = [
+                ['name' => 'nama_kelas', 'type' => 'string', 'required' => true, 'description' => 'Nama kelas'],
+                ['name' => 'tingkat', 'type' => 'string', 'required' => true, 'description' => 'Tingkat kelas (1-12)'],
+                ['name' => 'tahun_ajaran_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID tahun ajaran'],
+                ['name' => 'guru_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'UUID guru wali kelas'],
+                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
+            ];
+        } elseif (strpos($uri, 'sekolah') !== false) {
+            $bodyParams = [
+                ['name' => 'nama_sekolah', 'type' => 'string', 'required' => true, 'description' => 'Nama sekolah'],
+                ['name' => 'npsn', 'type' => 'string', 'required' => true, 'description' => 'Nomor Pokok Sekolah Nasional'],
+                ['name' => 'alamat', 'type' => 'string', 'required' => true, 'description' => 'Alamat sekolah'],
+                ['name' => 'kota', 'type' => 'string', 'required' => true, 'description' => 'Kota'],
+                ['name' => 'provinsi', 'type' => 'string', 'required' => true, 'description' => 'Provinsi'],
+                ['name' => 'kode_pos', 'type' => 'string', 'required' => false, 'description' => 'Kode pos'],
+                ['name' => 'no_telp', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon'],
+                ['name' => 'email', 'type' => 'string', 'required' => false, 'description' => 'Email sekolah'],
+                ['name' => 'website', 'type' => 'string', 'required' => false, 'description' => 'Website sekolah'],
+                ['name' => 'kepala_sekolah', 'type' => 'string', 'required' => false, 'description' => 'Nama kepala sekolah'],
+                ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Status aktif (true/false)']
+            ];
+        }
+    }
+    
+    $queryParams = [];
+    if ($method === 'GET') {
+        $queryParams = [
+            ['name' => 'page', 'type' => 'integer', 'required' => false, 'description' => 'Nomor halaman untuk pagination'],
+            ['name' => 'per_page', 'type' => 'integer', 'required' => false, 'description' => 'Jumlah item per halaman']
+        ];
+        
+        // Tambahkan filter khusus berdasarkan URI
+        if (strpos($uri, 'siswa') !== false) {
+            $queryParams[] = ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan kelas'];
+            $queryParams[] = ['name' => 'nama', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama siswa'];
+            $queryParams[] = ['name' => 'nis', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan NIS'];
+        } elseif (strpos($uri, 'guru') !== false) {
+            $queryParams[] = ['name' => 'nama', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama guru'];
+            $queryParams[] = ['name' => 'nip', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan NIP'];
+        } elseif (strpos($uri, 'nilai') !== false) {
+            $queryParams[] = ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan siswa'];
+            $queryParams[] = ['name' => 'tp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan tujuan pembelajaran'];
+            $queryParams[] = ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan capaian pembelajaran'];
+            $queryParams[] = ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan mata pelajaran'];
+        } elseif (strpos($uri, 'absensi') !== false) {
+            $queryParams[] = ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan siswa'];
+            $queryParams[] = ['name' => 'pertemuan_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan pertemuan'];
+            $queryParams[] = ['name' => 'bulan', 'type' => 'integer', 'required' => false, 'description' => 'Filter berdasarkan bulan (1-12)'];
+            $queryParams[] = ['name' => 'tahun', 'type' => 'integer', 'required' => false, 'description' => 'Filter berdasarkan tahun (YYYY)'];
+        } elseif (strpos($uri, 'kelas') !== false) {
+            $queryParams[] = ['name' => 'tahun_ajaran_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan tahun ajaran'];
+            $queryParams[] = ['name' => 'tingkat', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan tingkat kelas'];
+            $queryParams[] = ['name' => 'guru_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan guru wali kelas'];
+        } elseif (strpos($uri, 'mapel') !== false) {
+            $queryParams[] = ['name' => 'tingkat', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan tingkat kelas'];
+            $queryParams[] = ['name' => 'nama_mapel', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama mata pelajaran'];
+        } elseif (strpos($uri, 'cp') !== false) {
+            $queryParams[] = ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan mata pelajaran'];
+        } elseif (strpos($uri, 'tp') !== false) {
+            $queryParams[] = ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan capaian pembelajaran'];
+        } elseif (strpos($uri, 'tahun-ajaran') !== false) {
+            $queryParams[] = ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Filter berdasarkan status aktif'];
+        }
+        
+        // Tambahkan filter umum untuk semua endpoint
+        $queryParams[] = ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan sekolah'];
+        $queryParams[] = ['name' => 'search', 'type' => 'string', 'required' => false, 'description' => 'Pencarian global'];
+        $queryParams[] = ['name' => 'sort_by', 'type' => 'string', 'required' => false, 'description' => 'Kolom untuk pengurutan'];
+        $queryParams[] = ['name' => 'sort_dir', 'type' => 'string', 'required' => false, 'description' => 'Arah pengurutan (asc/desc)'];
+    }
+    
+    return [
+        'url' => $fullUrl,
+        'method' => $method,
+        'headers' => $headers,
+        'path_params' => $params,
+        'query_params' => $queryParams,
+        'body_params' => $bodyParams
+    ];
+}
+
 $router->get('/', function () use ($router) {
     $routes = [];
     
@@ -58,6 +307,7 @@ $router->get('/', function () use ($router) {
             $uri = $route['uri'];
             $action = $route['action'];
             $fullUrl = $baseUrl . '/' . ltrim($uri, '/');
+            $usageInfo = getEndpointUsageInfo($method, $uri, $baseUrl);
             
             $routesHtml .= "
             <div class='endpoint-card'>
@@ -77,6 +327,208 @@ $router->get('/', function () use ($router) {
                                 <path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path>
                             </svg>
                         </button>
+                    </div>
+                    
+                    <div class='usage-info'>
+                        <div class='usage-toggle' onclick='toggleUsageInfo(this)'>
+                            <span>Cara Penggunaan di Postman</span>
+                            <svg class='toggle-icon' xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                                <polyline points='6 9 12 15 18 9'></polyline>
+                            </svg>
+                        </div>
+                        <div class='usage-details' style='display: none;'>";
+            
+            // Headers
+            if (!empty($usageInfo['headers'])) {
+                $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Headers:</div>
+                                <div class='usage-table'>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Nama</th>
+                                                <th>Nilai</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>";
+                
+                foreach ($usageInfo['headers'] as $header) {
+                    $routesHtml .= "
+                                        <tr>
+                                            <td>{$header['name']}</td>
+                                            <td>{$header['value']}</td>
+                                        </tr>";
+                }
+                
+                $routesHtml .= "
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>";
+            }
+            
+            // Path Parameters
+            if (!empty($usageInfo['path_params'])) {
+                $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Path Parameters:</div>
+                                <div class='usage-table'>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Nama</th>
+                                                <th>Tipe</th>
+                                                <th>Wajib</th>
+                                                <th>Deskripsi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>";
+                
+                foreach ($usageInfo['path_params'] as $param) {
+                    $required = $param['required'] ? 'Ya' : 'Tidak';
+                    $routesHtml .= "
+                                        <tr>
+                                            <td>{$param['name']}</td>
+                                            <td>{$param['type']}</td>
+                                            <td>{$required}</td>
+                                            <td>{$param['description']}</td>
+                                        </tr>";
+                }
+                
+                $routesHtml .= "
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>";
+            }
+            
+            // Query Parameters
+            if (!empty($usageInfo['query_params'])) {
+                $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Query Parameters:</div>
+                                <div class='usage-table'>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Nama</th>
+                                                <th>Tipe</th>
+                                                <th>Wajib</th>
+                                                <th>Deskripsi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>";
+                
+                foreach ($usageInfo['query_params'] as $param) {
+                    $required = $param['required'] ? 'Ya' : 'Tidak';
+                    $routesHtml .= "
+                                        <tr>
+                                            <td>{$param['name']}</td>
+                                            <td>{$param['type']}</td>
+                                            <td>{$required}</td>
+                                            <td>{$param['description']}</td>
+                                        </tr>";
+                }
+                
+                $routesHtml .= "
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>";
+            }
+            
+            // Body Parameters
+            if (!empty($usageInfo['body_params'])) {
+                $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Body Parameters:</div>
+                                <div class='usage-table'>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Nama</th>
+                                                <th>Tipe</th>
+                                                <th>Wajib</th>
+                                                <th>Deskripsi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>";
+                
+                foreach ($usageInfo['body_params'] as $param) {
+                    $required = $param['required'] ? 'Ya' : 'Tidak';
+                    $routesHtml .= "
+                                        <tr>
+                                            <td>{$param['name']}</td>
+                                            <td>{$param['type']}</td>
+                                            <td>{$required}</td>
+                                            <td>{$param['description']}</td>
+                                        </tr>";
+                }
+                
+                $routesHtml .= "
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>";
+            
+                // Tambahkan contoh JSON body
+                $jsonExample = "{\n";
+                foreach ($usageInfo['body_params'] as $index => $param) {
+                    $exampleValue = '';
+                    switch ($param['type']) {
+                        case 'string':
+                            $exampleValue = '"contoh_' . $param['name'] . '"';
+                            break;
+                        case 'integer':
+                        case 'number':
+                            $exampleValue = '1';
+                            break;
+                        case 'boolean':
+                            $exampleValue = 'true';
+                            break;
+                        case 'date':
+                            $exampleValue = '"' . date('Y-m-d') . '"';
+                            break;
+                        default:
+                            $exampleValue = '""';
+                    }
+                    
+                    $jsonExample .= "    \"" . $param['name'] . "\": " . $exampleValue;
+                    if ($index < count($usageInfo['body_params']) - 1) {
+                        $jsonExample .= ",\n";
+                    } else {
+                        $jsonExample .= "\n";
+                    }
+                }
+                $jsonExample .= "}";
+                
+                $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Contoh JSON Body:</div>
+                                <div class='usage-code'>
+                                    <pre><code class='json'>" . htmlspecialchars($jsonExample) . "</code></pre>
+                                    <button class='copy-btn' onclick='copyToClipboard(this)' data-url='" . htmlspecialchars($jsonExample) . "'>
+                                        <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+                                            <rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect>
+                                            <path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>";
+            }
+            
+            // Contoh Response
+            $responseExample = "{\n    \"status\": \"success\",\n    \"message\": \"Data berhasil diambil\",\n    \"data\": {}\n}";
+            
+            $routesHtml .= "
+                            <div class='usage-section'>
+                                <div class='usage-label'>Contoh Response:</div>
+                                <div class='usage-code'>
+                                    <pre><code class='json'>" . htmlspecialchars($responseExample) . "</code></pre>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>";
@@ -341,6 +793,100 @@ $router->get('/', function () use ($router) {
                     grid-template-columns: 1fr;
                 }
             }
+            
+            .usage-info {
+                margin-top: 1rem;
+                border-top: 1px solid var(--border-color);
+                padding-top: 1rem;
+            }
+            
+            .usage-toggle {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: pointer;
+                padding: 0.5rem;
+                background-color: var(--light-color);
+                border-radius: 0.25rem;
+                font-weight: 500;
+                color: var(--primary-color);
+                transition: all 0.2s;
+            }
+            
+            .usage-toggle:hover {
+                background-color: rgba(59, 130, 246, 0.1);
+            }
+            
+            .toggle-icon {
+                transition: transform 0.2s;
+            }
+            
+            .toggle-icon.open {
+                transform: rotate(180deg);
+            }
+            
+            .usage-details {
+                padding: 1rem;
+                background-color: var(--light-color);
+                border-radius: 0.25rem;
+                margin-top: 0.5rem;
+            }
+            
+            .usage-section {
+                margin-bottom: 1rem;
+            }
+            
+            .usage-label {
+                font-size: 0.875rem;
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+                color: var(--secondary-color);
+            }
+            
+            .usage-table table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.8125rem;
+            }
+            
+            .usage-table th,
+            .usage-table td {
+                padding: 0.5rem;
+                text-align: left;
+                border: 1px solid var(--border-color);
+            }
+            
+            .usage-table th {
+                background-color: var(--light-color);
+                font-weight: 500;
+            }
+            
+            .usage-code {
+                position: relative;
+                background-color: var(--dark-color);
+                color: var(--light-color);
+                padding: 1rem;
+                border-radius: 0.25rem;
+                font-family: monospace;
+                font-size: 0.8125rem;
+                overflow-x: auto;
+            }
+            
+            .usage-code pre {
+                margin: 0;
+            }
+            
+            .usage-code .copy-btn {
+                position: absolute;
+                top: 0.5rem;
+                right: 0.5rem;
+                color: var(--light-color);
+            }
+            
+            .usage-code .copy-btn:hover {
+                color: var(--primary-color);
+                background-color: rgba(255, 255, 255, 0.1);
+            }
         </style>
     </head>
     <body>
@@ -384,6 +930,19 @@ $router->get('/', function () use ($router) {
                         button.classList.remove('copied');
                     }, 2000);
                 });
+            }
+
+            function toggleUsageInfo(element) {
+                const details = element.nextElementSibling;
+                const icon = element.querySelector('.toggle-icon');
+                
+                if (details.style.display === 'none') {
+                    details.style.display = 'block';
+                    icon.classList.add('open');
+                } else {
+                    details.style.display = 'none';
+                    icon.classList.remove('open');
+                }
             }
         </script>
     </body>
