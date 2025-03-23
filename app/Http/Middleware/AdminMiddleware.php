@@ -5,15 +5,13 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
-use Illuminate\Support\Facades\Auth;
 
 class AdminMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        // Pastikan user sudah login dan dapatkan data user
-        $user = Auth::user();
-        
+        $user = $request->user();
+
         if (!$user) {
             return ResponseBuilder::error(401, "Silakan login terlebih dahulu");
         }

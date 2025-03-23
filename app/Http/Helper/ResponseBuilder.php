@@ -1,36 +1,34 @@
 <?php
 
-namespace  App\Http\Helper;
+namespace App\Http\Helper;
 
 class ResponseBuilder
 {
-    public static function success($status = 200, $message = "", $data = [], $success = true, $is_post = false)
+    public static function success($status = 200, $message = "", $data = null, $success = true, $is_post = false)
     {
-        if ($data) {
-            # code...
+        if ($data !== null) {
             return response()->json([
                 "status" => $status,
                 "success" => $success,
                 "message" => $message,
-                "total_data" => $is_post ? 0 : count($data),
+                "total_data" => $is_post ? 0 : (is_array($data) || $data instanceof \Countable ? count($data) : 1),
                 "data" => $data
             ], $status);
         } else {
             return response()->json([
                 "status" => $status,
                 "success" => $success,
-                "message" => $message,
-                "total_data" => 0,
-                "data" => []
+                "message" => $message
             ], $status);
         }
     }
-    public static function error($status = "", $error = "", $data = [])
+
+    public static function error($status = 400, $message = "")
     {
-        return [
+        return response()->json([
             "status" => $status,
-            "info" => $error,
-            "error" => $data
-        ];
+            "success" => false,
+            "message" => $message
+        ], $status);
     }
 }

@@ -400,6 +400,93 @@ $router->group(['prefix' => 'auth'], function () use ($router) {
     $router->post('/logout', 'AuthController@logout');
 });
 
+// Tambahkan route group untuk admin dashboard
+$router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], function () use ($router) {
+    // Dashboard
+    $router->get('/dashboard', 'Admin\DashboardController@index');
+    
+    // Manajemen Tahun Ajaran
+    $router->get('/tahun-ajaran', 'Admin\TahunAjaranController@index');
+    $router->post('/tahun-ajaran', 'Admin\TahunAjaranController@store');
+    $router->put('/tahun-ajaran/{id}', 'Admin\TahunAjaranController@update');
+    $router->put('/tahun-ajaran/{id}/activate', 'Admin\TahunAjaranController@activate');
+    
+    // Manajemen Data Master
+    $router->group(['prefix' => 'master'], function () use ($router) {
+        // Mata Pelajaran
+        $router->get('/mapel', 'Admin\MataPelajaranController@index');
+        $router->post('/mapel', 'Admin\MataPelajaranController@store');
+        $router->put('/mapel/{id}', 'Admin\MataPelajaranController@update');
+        
+        // Capaian Pembelajaran
+        $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
+        $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
+        $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
+        
+        // Tujuan Pembelajaran
+        $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
+        $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
+        $router->put('/tp/{id}', 'Admin\TujuanPembelajaranController@update');
+    });
+    
+    // Manajemen Guru
+    $router->get('/guru', 'Admin\GuruController@index');
+    $router->post('/guru', 'Admin\GuruController@store');
+    $router->put('/guru/{id}', 'Admin\GuruController@update');
+    $router->post('/guru/import', 'Admin\GuruController@import');
+    
+    // Manajemen Siswa
+    $router->get('/siswa', 'Admin\SiswaController@index');
+    $router->post('/siswa', 'Admin\SiswaController@store');
+    $router->put('/siswa/{id}', 'Admin\SiswaController@update');
+    $router->post('/siswa/import', 'Admin\SiswaController@import');
+    
+    // Manajemen Kelas
+    $router->get('/kelas', 'Admin\KelasController@index');
+    $router->post('/kelas', 'Admin\KelasController@store');
+    $router->put('/kelas/{id}', 'Admin\KelasController@update');
+    
+    // Pengaturan
+    $router->get('/settings', 'Admin\SettingController@index');
+    $router->post('/settings', 'Admin\SettingController@store');
+    $router->put('/settings/{id}', 'Admin\SettingController@update');
+    
+    // Laporan
+    $router->get('/reports/nilai', 'Admin\ReportController@nilai');
+    $router->get('/reports/absensi', 'Admin\ReportController@absensi');
+    $router->get('/reports/aktivitas', 'Admin\ReportController@aktivitas');
+});
+
+// Guru Routes
+$router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
+    // Dashboard
+    $router->get('/dashboard', 'Guru\DashboardController@index');
+    
+    // Nilai Routes
+    $router->group(['prefix' => 'nilai'], function () use ($router) {
+        $router->get('/', 'Guru\NilaiController@index');
+        $router->post('/', 'Guru\NilaiController@store');
+        $router->put('/{id}', 'Guru\NilaiController@update');
+    });
+    
+    // Absensi Routes  
+    $router->group(['prefix' => 'absensi'], function () use ($router) {
+        $router->get('/', 'Guru\AbsensiController@index');
+        $router->post('/', 'Guru\AbsensiController@store');
+    });
+    
+    // Rekap Routes
+    $router->group(['prefix' => 'rekap'], function () use ($router) {
+        $router->get('/nilai', 'Guru\RekapController@nilai');
+        $router->get('/absensi', 'Guru\RekapController@absensi');
+    });
+});
+
+//kebawah sisanya endpoint 1-1 bukan paket
+$router->group(['prefix' => 'endpoint_dibawah_ini_1-1_bukan_paket'], function () use ($router) {
+    $router->get('/pembatas', 'InfoController@index');
+});
+
 // User Routes
 $router->group(['prefix' => 'user', 'middleware' => 'login'], function () use ($router) {
     $router->get('/', 'UserController@index');
@@ -437,19 +524,6 @@ $router->group(['prefix' => 'sekolah', 'middleware' => 'login'], function () use
     $router->get('/{id}/guru', 'SekolahController@getGuru');
     $router->get('/{id}/siswa', 'SekolahController@getSiswa');
     $router->get('/{id}/kelas', 'SekolahController@getKelas');
-});
-
-// Guru Routes
-$router->group(['prefix' => 'guru', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'GuruController@index');
-    $router->post('/', 'GuruController@store');
-    $router->get('/{id}', 'GuruController@show');
-    $router->put('/{id}', 'GuruController@update');
-    $router->delete('/{id}', 'GuruController@destroy');
-    $router->get('/{id}/jadwal', 'GuruController@getJadwal');
-    $router->get('/{id}/kelas', 'GuruController@getKelas');
-    $router->get('/{id}/mapel', 'GuruController@getMapel');
-    $router->post('/import', 'GuruController@import');
 });
 
 // Tahun Ajaran Routes
@@ -599,17 +673,15 @@ $router->group(['prefix' => 'api/guru', 'middleware' => 'login'], function () us
     $router->get('/dashboard/activities', 'API\GuruController@getRecentActivities');
 });
 
-// Admin Routes untuk manajemen guru
-$router->group(['prefix' => 'admin/guru', 'middleware' => ['login', 'admin']], function () use ($router) {
-    $router->get('/', 'Admin\GuruController@index');
-    $router->post('/', 'Admin\GuruController@store');
-    $router->get('/{id}', 'Admin\GuruController@show');
-    $router->put('/{id}', 'Admin\GuruController@update');
-    $router->delete('/{id}', 'Admin\GuruController@destroy');
-    $router->post('/reset-password/{id}', 'Admin\GuruController@resetPassword');
-    $router->post('/activate/{id}', 'Admin\GuruController@activate');
-    $router->post('/deactivate/{id}', 'Admin\GuruController@deactivate');
+// Admin Routes
+$router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], function () use ($router) {
+    $router->get('/sekolah', 'Admin\SekolahController@index');
+    $router->get('/sekolah/{id}', 'Admin\SekolahController@show');
+    $router->post('/sekolah', 'Admin\SekolahController@store');
+    $router->put('/sekolah/{id}', 'Admin\SekolahController@update');
+    $router->delete('/sekolah/{id}', 'Admin\SekolahController@destroy');
 });
+
 
 
 // Setting Routes

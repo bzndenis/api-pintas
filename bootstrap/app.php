@@ -104,7 +104,8 @@ $app->configure('app');
 
 $app->routeMiddleware([
     'login' => App\Http\Middleware\LoginMiddleware::class,
-    'admin' => App\Http\Middleware\AdminMiddleware::class
+    'admin' => App\Http\Middleware\AdminMiddleware::class,
+    'guru' => App\Http\Middleware\GuruMiddleware::class,
 ]);
 
 /*

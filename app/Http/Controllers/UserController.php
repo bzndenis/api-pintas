@@ -128,33 +128,47 @@ class UserController extends Controller
 
     public function show($id)
     {
-        $user = User::with(['sekolah', 'guru'])->find($id);
-        
-        if (!$user) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
+        try {
+            // Validasi format UUID
+            if (!Uuid::isValid($id)) {
+                return ResponseBuilder::error(400, "Format ID tidak valid");
+            }
+
+            $user = User::with(['sekolah', 'guru'])->find($id);
+            
+            if (!$user) {
+                return ResponseBuilder::error(404, "Data user tidak ditemukan");
+            }
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data user", ['user' => $user]);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
-        
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $user, true);
     }
 
     public function update(Request $request, $id)
     {
-        $user = User::find($id);
-        
-        if (!$user) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
-        
-        $this->validate($request, [
-            'email' => 'sometimes|required|unique:users,email,'.$id.',id|max:255',
-            'role' => 'sometimes|required|in:super_admin,admin,guru',
-            'sekolah_id' => 'nullable|required_if:role,admin,guru|exists:sekolah,id',
-            'nama_lengkap' => 'sometimes|required|string|max:255',
-            'no_telepon' => 'nullable|string|max:20',
-            'alamat_sekolah' => 'nullable|string'
-        ]);
-        
         try {
+            // Validasi format UUID
+            if (!Uuid::isValid($id)) {
+                return ResponseBuilder::error(400, "Format ID tidak valid");
+            }
+
+            $user = User::find($id);
+            
+            if (!$user) {
+                return ResponseBuilder::error(404, "Data user tidak ditemukan");
+            }
+            
+            $this->validate($request, [
+                'email' => 'sometimes|required|unique:users,email,'.$id.',id|max:255',
+                'role' => 'sometimes|required|in:super_admin,admin,guru',
+                'sekolah_id' => 'nullable|required_if:role,admin,guru|exists:sekolah,id',
+                'nama_lengkap' => 'sometimes|required|string|max:255',
+                'no_telepon' => 'nullable|string|max:20',
+                'alamat_sekolah' => 'nullable|string'
+            ]);
+            
             DB::beginTransaction();
             
             $updateData = $request->only([

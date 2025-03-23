@@ -11,6 +11,8 @@ class Sekolah extends Model
     use SoftDeletes;
     
     protected $table = 'sekolah';
+    public $incrementing = false;
+    protected $keyType = 'string';
     
     protected $fillable = [
         'id',
@@ -26,6 +28,7 @@ class Sekolah extends Model
         'kepala_sekolah',
         'logo',
         'is_active',
+        'status'
     ];
     
     protected $casts = [
