@@ -986,6 +986,7 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
         $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
         $router->delete('/cp/{id}', 'Admin\CapaianPembelajaranController@destroy');
         $router->post('/cp/batch', 'Admin\CapaianPembelajaranController@storeBatch');
+        
         // Tujuan Pembelajaran
         $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
         $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
