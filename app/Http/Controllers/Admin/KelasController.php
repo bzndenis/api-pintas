@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\Kelas;
+use App\Models\Siswa;
+use App\Models\Guru;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
@@ -63,15 +65,14 @@ class KelasController extends BaseAdminController
         ]);
 
         try {
-            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)
-                ->find($id);
-
+            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)->find($id);
+            
             if (!$kelas) {
                 return ResponseBuilder::error(404, "Kelas tidak ditemukan");
             }
-
+            
             $kelas->update($request->all());
-
+            
             return ResponseBuilder::success(200, "Berhasil mengupdate kelas", $kelas);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
@@ -81,35 +82,101 @@ class KelasController extends BaseAdminController
     public function destroy($id)
     {
         try {
-            $admin = Auth::user();
-            
-            $kelas = Kelas::where('sekolah_id', $admin->sekolah_id)->find($id);
+            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)->find($id);
             
             if (!$kelas) {
-                return ResponseBuilder::error(404, "Data kelas tidak ditemukan");
+                return ResponseBuilder::error(404, "Kelas tidak ditemukan");
             }
-            
-            DB::beginTransaction();
             
             // Cek apakah kelas masih memiliki siswa
             if ($kelas->siswa()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus kelas yang masih memiliki siswa");
             }
             
-            // Cek apakah kelas masih memiliki jadwal
-            if ($kelas->jadwal()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus kelas yang masih memiliki jadwal");
+            $kelas->delete();
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus kelas");
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+        }
+    }
+
+    public function detail($id)
+    {
+        try {
+            $kelas = Kelas::with(['tahunAjaran', 'guru', 'siswa'])
+                ->where('sekolah_id', Auth::user()->sekolah_id)
+                ->find($id);
+            
+            if (!$kelas) {
+                return ResponseBuilder::error(404, "Kelas tidak ditemukan");
             }
             
-            // Hapus kelas
-            $kelas->delete();
+            return ResponseBuilder::success(200, "Berhasil mendapatkan detail kelas", $kelas);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
+    public function assignGuru(Request $request, $id)
+    {
+        $this->validate($request, [
+            'guru_id' => 'required|exists:guru,id'
+        ]);
+
+        try {
+            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)->find($id);
+            
+            if (!$kelas) {
+                return ResponseBuilder::error(404, "Kelas tidak ditemukan");
+            }
+            
+            $guru = Guru::where('sekolah_id', Auth::user()->sekolah_id)
+                ->find($request->guru_id);
+            
+            if (!$guru) {
+                return ResponseBuilder::error(404, "Guru tidak ditemukan");
+            }
+            
+            $kelas->guru_id = $guru->id;
+            $kelas->save();
+            
+            return ResponseBuilder::success(200, "Berhasil menetapkan guru ke kelas", $kelas);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal menetapkan guru: " . $e->getMessage());
+        }
+    }
+
+    public function assignSiswa(Request $request, $id)
+    {
+        $this->validate($request, [
+            'siswa_ids' => 'required|array',
+            'siswa_ids.*' => 'exists:siswa,id'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)->find($id);
+            
+            if (!$kelas) {
+                return ResponseBuilder::error(404, "Kelas tidak ditemukan");
+            }
+            
+            // Update kelas_id untuk semua siswa yang dipilih
+            Siswa::whereIn('id', $request->siswa_ids)
+                ->where('sekolah_id', Auth::user()->sekolah_id)
+                ->update(['kelas_id' => $kelas->id]);
             
             DB::commit();
             
-            return ResponseBuilder::success(200, "Berhasil menghapus data kelas");
+            return ResponseBuilder::success(200, "Berhasil menetapkan siswa ke kelas", [
+                'kelas' => $kelas,
+                'siswa_count' => count($request->siswa_ids)
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menetapkan siswa: " . $e->getMessage());
         }
     }
 } 

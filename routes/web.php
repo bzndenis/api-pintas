@@ -980,6 +980,11 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
         $router->put('/mapel/{id}', 'Admin\MataPelajaranController@update');
         $router->delete('/mapel/{id}', 'Admin\MataPelajaranController@destroy');
         
+        // Tambahkan endpoint untuk ekspor template mapel
+        $router->get('/mapel/template', 'Admin\MataPelajaranController@getTemplate');
+        // Tambahkan endpoint untuk impor mapel
+        $router->post('/mapel/import', 'Admin\MataPelajaranController@import');
+        
         // Capaian Pembelajaran
         $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
         $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
@@ -1011,30 +1016,25 @@ $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], functi
     $router->put('/siswa/{id}', 'Admin\SiswaController@update');
     $router->delete('/siswa/{id}', 'Admin\SiswaController@destroy');
     $router->post('/siswa/import', 'Admin\SiswaController@import');
+    $router->get('/siswa/template', 'Admin\SiswaController@getTemplate');
     
     // Manajemen Kelas
     $router->get('/kelas', 'Admin\KelasController@index');
     $router->post('/kelas', 'Admin\KelasController@store');
     $router->put('/kelas/{id}', 'Admin\KelasController@update');
     $router->delete('/kelas/{id}', 'Admin\KelasController@destroy');
+    $router->get('/kelas/{id}/detail', 'Admin\KelasController@detail');
+    $router->post('/kelas/{id}/assign-guru', 'Admin\KelasController@assignGuru');
+    $router->post('/kelas/{id}/assign-siswa', 'Admin\KelasController@assignSiswa');
     
     // Laporan
     $router->get('/reports/nilai', 'Admin\ReportController@nilai');
+    $router->get('/reports/nilai/export', 'Admin\ReportController@exportNilai');
     $router->get('/reports/absensi', 'Admin\ReportController@absensi');
     $router->get('/reports/aktivitas', 'Admin\ReportController@aktivitas');
 
-    // Pengaturan
-    // $router->get('/settings', 'Admin\SettingController@index');
-    // $router->post('/settings', 'Admin\SettingController@store');
-    // $router->put('/settings/{id}', 'Admin\SettingController@update');
-
-    // Guru Routes
-    $router->group(['prefix' => 'guru'], function () use ($router) {
-        // Route statis terlebih dahulu
-        $router->get('/template', 'Admin\GuruController@getTemplate');
-        $router->post('/batch', 'Admin\GuruController@storeBatch');
-        
-    });
+    // Tambahkan route ini di dalam grup admin
+    $router->get('/storage/link', 'Admin\StorageController@createStorageLink');
 });
 
 // Guru Routes

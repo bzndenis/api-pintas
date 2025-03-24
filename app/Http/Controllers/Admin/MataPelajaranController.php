@@ -7,17 +7,27 @@ use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class MataPelajaranController extends BaseAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            // Ambil data mata pelajaran berdasarkan sekolah_id user yang login
-            $mapel = MataPelajaran::where('sekolah_id', Auth::user()->sekolah_id)
-                ->get();
+            $query = MataPelajaran::with(['guru'])
+                ->where('sekolah_id', Auth::user()->sekolah_id);
+            
+            if ($request->tingkat) {
+                $query->where('tingkat', $request->tingkat);
+            }
+            
+            if ($request->guru_id) {
+                $query->where('guru_id', $request->guru_id);
+            }
+            
+            $mapel = $query->orderBy('nama_mapel', 'asc')->get();
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data mata pelajaran", $mapel);
         } catch (\Exception $e) {
@@ -28,9 +38,10 @@ class MataPelajaranController extends BaseAdminController
     public function store(Request $request)
     {
         $this->validate($request, [
-            'nama_mapel' => 'required|string|max:255',
             'kode_mapel' => 'required|string|max:50',
-            'guru_id' => 'required|string|uuid|exists:guru,id'
+            'nama_mapel' => 'required|string|max:255',
+            'tingkat' => 'required|string|max:50',
+            'guru_id' => 'required|exists:guru,id'
         ]);
 
         try {
@@ -48,9 +59,10 @@ class MataPelajaranController extends BaseAdminController
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'nama_mapel' => 'required|string|max:255',
             'kode_mapel' => 'required|string|max:50',
-            'guru_id' => 'required|string|uuid|exists:guru,id'
+            'nama_mapel' => 'required|string|max:255',
+            'tingkat' => 'required|string|max:50',
+            'guru_id' => 'required|exists:guru,id'
         ]);
 
         try {
@@ -72,32 +84,22 @@ class MataPelajaranController extends BaseAdminController
     public function destroy($id)
     {
         try {
-            $admin = Auth::user();
-            
-            $mapel = MataPelajaran::where('sekolah_id', $admin->sekolah_id)->find($id);
+            $mapel = MataPelajaran::where('sekolah_id', Auth::user()->sekolah_id)
+                ->find($id);
             
             if (!$mapel) {
-                return ResponseBuilder::error(404, "Data mata pelajaran tidak ditemukan");
+                return ResponseBuilder::error(404, "Mata pelajaran tidak ditemukan");
             }
             
-            DB::beginTransaction();
-            
-            // Hapus mata pelajaran tanpa pengecekan relasi guru
-            // karena method guru() tidak tersedia
-            
-            // Cek apakah mata pelajaran masih digunakan oleh capaian pembelajaran
-            if (method_exists($mapel, 'capaianPembelajaran') && $mapel->capaianPembelajaran()->count() > 0) {
+            // Cek apakah mapel masih memiliki capaian pembelajaran
+            if ($mapel->capaianPembelajaran()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus mata pelajaran yang masih memiliki capaian pembelajaran");
             }
             
-            // Hapus mata pelajaran
             $mapel->delete();
             
-            DB::commit();
-            
-            return ResponseBuilder::success(200, "Berhasil menghapus data mata pelajaran");
+            return ResponseBuilder::success(200, "Berhasil menghapus mata pelajaran");
         } catch (\Exception $e) {
-            DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
@@ -105,100 +107,158 @@ class MataPelajaranController extends BaseAdminController
     public function storeBatch(Request $request)
     {
         $this->validate($request, [
-            'mapel' => 'required|array|min:1',
-            'mapel.*.nama' => 'required|string|max:255',
-            'mapel.*.kode' => 'required|string|max:50',
+            'mapel' => 'required|array',
+            'mapel.*.kode_mapel' => 'required|string|max:50',
+            'mapel.*.nama_mapel' => 'required|string|max:255',
             'mapel.*.tingkat' => 'required|string|max:50',
-            'mapel.*.guru_id' => 'nullable|string|uuid|exists:guru,id'
+            'mapel.*.guru_id' => 'required|exists:guru,id'
         ]);
 
         try {
-            $admin = Auth::user();
-            \Log::info('Admin yang melakukan import: ', ['id' => $admin->id, 'sekolah_id' => $admin->sekolah_id]);
-            
-            $mapelData = $request->mapel;
-            $importedData = [];
-            $errors = [];
-            $imported = 0;
-            
-            // Nonaktifkan foreign key check sementara
-            DB::statement('SET FOREIGN_KEY_CHECKS=0');
             DB::beginTransaction();
             
-            foreach ($mapelData as $index => $data) {
+            $sekolahId = Auth::user()->sekolah_id;
+            $mapelData = [];
+            
+            foreach ($request->mapel as $data) {
+                $data['sekolah_id'] = $sekolahId;
+                $mapel = MataPelajaran::create($data);
+                $mapelData[] = $mapel;
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(201, "Berhasil menambahkan " . count($mapelData) . " mata pelajaran", $mapelData);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
+        }
+    }
+
+    public function getTemplate()
+    {
+        try {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            
+            // Set header
+            $sheet->setCellValue('A1', 'Kode Mapel');
+            $sheet->setCellValue('B1', 'Nama Mapel');
+            $sheet->setCellValue('C1', 'Tingkat');
+            $sheet->setCellValue('D1', 'ID Guru');
+            
+            // Contoh data
+            $sheet->setCellValue('A2', 'MTK-01');
+            $sheet->setCellValue('B2', 'Matematika');
+            $sheet->setCellValue('C2', '1');
+            $sheet->setCellValue('D2', '[ID Guru]');
+            
+            $sheet->setCellValue('A3', 'BIN-01');
+            $sheet->setCellValue('B3', 'Bahasa Indonesia');
+            $sheet->setCellValue('C3', '1');
+            $sheet->setCellValue('D3', '[ID Guru]');
+            
+            // Set style header
+            $sheet->getStyle('A1:D1')->getFont()->setBold(true);
+            
+            // Auto size kolom
+            foreach (range('A', 'D') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            // Buat file Excel
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'template_mapel_' . date('YmdHis') . '.xlsx';
+            $path = storage_path('app/public/' . $filename);
+            $writer->save($path);
+            
+            return response()->download($path, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal membuat template: " . $e->getMessage());
+        }
+    }
+
+    public function import(Request $request)
+    {
+        $this->validate($request, [
+            'file' => 'required|file|mimes:xlsx,xls'
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($file->getPathname());
+            $spreadsheet = $reader->load($file->getPathname());
+            $worksheet = $spreadsheet->getActiveSheet();
+            $rows = $worksheet->toArray();
+            
+            // Hapus header
+            array_shift($rows);
+            
+            DB::beginTransaction();
+            
+            $sekolahId = Auth::user()->sekolah_id;
+            $imported = 0;
+            $errors = [];
+            $importedData = [];
+            
+            foreach ($rows as $index => $row) {
+                // Skip baris kosong
+                if (empty($row[0]) && empty($row[1]) && empty($row[2]) && empty($row[3])) {
+                    continue;
+                }
+                
+                $data = [
+                    'kode_mapel' => $row[0],
+                    'nama_mapel' => $row[1],
+                    'tingkat' => $row[2],
+                    'guru_id' => $row[3],
+                    'sekolah_id' => $sekolahId
+                ];
+                
+                $validator = Validator::make($data, [
+                    'kode_mapel' => 'required|string|max:50',
+                    'nama_mapel' => 'required|string|max:255',
+                    'tingkat' => 'required|string|max:50',
+                    'guru_id' => 'required|exists:guru,id',
+                    'sekolah_id' => 'required|exists:sekolah,id'
+                ]);
+                
+                if ($validator->fails()) {
+                    $errors[] = [
+                        'row' => $index + 2,
+                        'kode_mapel' => $data['kode_mapel'],
+                        'nama_mapel' => $data['nama_mapel'],
+                        'errors' => $validator->errors()->all()
+                    ];
+                    continue;
+                }
+                
                 try {
-                    // Log data yang akan diproses
-                    \Log::info('Processing mapel data: ', $data);
-                    
-                    // Buat UUID untuk mata pelajaran
-                    $mapelId = (string) Str::uuid();
-                    
-                    // Cek struktur tabel mata_pelajaran
-                    $tableColumns = DB::getSchemaBuilder()->getColumnListing('mata_pelajaran');
-                    \Log::info('Kolom tabel mata_pelajaran: ', $tableColumns);
-                    
-                    // Buat data mata pelajaran langsung dengan DB::table
-                    // Sesuaikan dengan struktur tabel yang benar
-                    $insertData = [
-                        'id' => $mapelId,
-                        'nama_mapel' => $data['nama'],
-                        'kode_mapel' => $data['kode'],
-                        'tingkat' => $data['tingkat'],
-                        'sekolah_id' => $admin->sekolah_id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
-                    ];
-                    
-                    // Jika kolom guru_id ada di tabel, tambahkan ke data
-                    if (in_array('guru_id', $tableColumns)) {
-                        $insertData['guru_id'] = $data['guru_id'] ?? null;
-                    }
-                    
-                    DB::table('mata_pelajaran')->insert($insertData);
-                    
-                    \Log::info('Mata pelajaran created with ID: ' . $mapelId);
-                    
-                    $importedData[] = [
-                        'id' => $mapelId,
-                        'nama_mapel' => $data['nama'],
-                        'kode_mapel' => $data['kode'],
-                        'tingkat' => $data['tingkat']
-                    ];
-                    
-                    // Jika kolom guru_id ada di tabel, tambahkan ke data hasil
-                    if (in_array('guru_id', $tableColumns)) {
-                        $importedData[count($importedData) - 1]['guru_id'] = $data['guru_id'] ?? null;
-                    }
-                    
+                    $mapel = MataPelajaran::create($data);
+                    $importedData[] = $mapel;
                     $imported++;
                 } catch (\Exception $e) {
-                    \Log::error('Error creating mapel: ' . $e->getMessage());
-                    \Log::error('Stack trace: ' . $e->getTraceAsString());
                     $errors[] = [
-                        'row' => $index + 1,
-                        'nama' => $data['nama'] ?? 'Unknown',
+                        'row' => $index + 2,
+                        'kode_mapel' => $data['kode_mapel'],
+                        'nama_mapel' => $data['nama_mapel'],
                         'error' => $e->getMessage()
                     ];
                 }
             }
             
             DB::commit();
-            // Aktifkan kembali foreign key check
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
             
-            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data mata pelajaran", [
+            return ResponseBuilder::success(200, "Berhasil mengimpor $imported mata pelajaran", [
                 'imported' => $imported,
                 'errors' => $errors,
                 'data' => $importedData
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            // Pastikan foreign key check diaktifkan kembali jika terjadi error
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
-            
-            \Log::error('Batch error: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
-            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengimpor data: " . $e->getMessage());
         }
     }
 } 
