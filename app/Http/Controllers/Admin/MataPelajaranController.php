@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\MataPelajaran;
+use App\Models\Guru;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ class MataPelajaranController extends BaseAdminController
     public function index(Request $request)
     {
         try {
-            $query = MataPelajaran::with(['guru'])
+            $query = MataPelajaran::query()
                 ->where('sekolah_id', Auth::user()->sekolah_id);
             
             if ($request->tingkat) {
@@ -28,6 +29,16 @@ class MataPelajaranController extends BaseAdminController
             }
             
             $mapel = $query->orderBy('nama_mapel', 'asc')->get();
+            
+            // Ambil data guru secara manual jika diperlukan
+            if ($mapel->isNotEmpty()) {
+                $guruIds = $mapel->pluck('guru_id')->unique()->toArray();
+                $gurus = Guru::whereIn('id', $guruIds)->get()->keyBy('id');
+                
+                foreach ($mapel as $item) {
+                    $item->guru = $gurus->get($item->guru_id);
+                }
+            }
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data mata pelajaran", $mapel);
         } catch (\Exception $e) {
