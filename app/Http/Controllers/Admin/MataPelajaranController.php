@@ -11,36 +11,31 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Ramsey\Uuid\Uuid;
 
 class MataPelajaranController extends BaseAdminController
 {
-    public function index(Request $request)
+    public function index()
     {
         try {
-            $query = MataPelajaran::query()
-                ->where('sekolah_id', Auth::user()->sekolah_id);
-            
-            if ($request->tingkat) {
-                $query->where('tingkat', $request->tingkat);
-            }
-            
-            if ($request->guru_id) {
-                $query->where('guru_id', $request->guru_id);
-            }
-            
-            $mapel = $query->orderBy('nama_mapel', 'asc')->get();
-            
-            // Ambil data guru secara manual jika diperlukan
-            if ($mapel->isNotEmpty()) {
-                $guruIds = $mapel->pluck('guru_id')->unique()->toArray();
-                $gurus = Guru::whereIn('id', $guruIds)->get()->keyBy('id');
+            $mapel = MataPelajaran::where('sekolah_id', Auth::user()->sekolah_id)
+                ->orderBy('nama_mapel', 'asc')
+                ->get();
                 
-                foreach ($mapel as $item) {
-                    $item->guru = $gurus->get($item->guru_id);
+            // Konversi ID ke UUID dan simpan perubahan 
+            $mapel->transform(function ($item) {
+                if (is_numeric($item->id)) {
+                    $oldId = $item->id;
+                    $item->id = Uuid::uuid4()->toString();
+                    $item->save();
+                    \Log::info("ID mata pelajaran dikonversi: {$oldId} -> {$item->id}");    
                 }
-            }
-            
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data mata pelajaran", $mapel);
+                return $item;
+            });
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data mata pelajaran", [
+                'mata_pelajaran' => $mapel
+            ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
@@ -56,13 +51,62 @@ class MataPelajaranController extends BaseAdminController
         ]);
 
         try {
-            $data = $request->all();
-            $data['sekolah_id'] = Auth::user()->sekolah_id;
+            DB::beginTransaction();
+            
+            $admin = Auth::user();
+            
+            // Debug untuk melihat nilai guru_id
+            \Log::info('Guru ID dari request: ' . $request->guru_id);
+            
+            // Pastikan guru_id ada dan valid
+            if (!$request->has('guru_id') || empty($request->guru_id)) {
+                return ResponseBuilder::error(400, "Field guru_id wajib diisi");
+            }
+            
+            // Verifikasi guru berada di sekolah yang sama
+            $guru = Guru::where('sekolah_id', $admin->sekolah_id)
+                ->where('id', $request->guru_id)
+                ->first();
+                
+            if (!$guru) {
+                return ResponseBuilder::error(400, "Guru tidak ditemukan atau tidak terdaftar di sekolah ini");
+            }
+            
+            // Buat array data secara eksplisit
+            $data = [
+                'kode_mapel' => $request->kode_mapel,
+                'nama_mapel' => $request->nama_mapel,
+                'tingkat' => $request->tingkat,
+                'guru_id' => $request->guru_id, // Pastikan nilai ini ada
+                'sekolah_id' => $admin->sekolah_id
+            ];
+            
+            // Debug data sebelum insert
+            \Log::info('Data untuk insert: ', $data);
+            
+            // Pastikan semua field yang diperlukan ada di $fillable
+            if (!in_array('guru_id', (new MataPelajaran)->getFillable())) {
+                return ResponseBuilder::error(500, "Field 'guru_id' tidak dapat diisi karena tidak ada dalam daftar fillable");
+            }
             
             $mapel = MataPelajaran::create($data);
             
-            return ResponseBuilder::success(201, "Berhasil menambahkan mata pelajaran", $mapel);
+            DB::commit();
+            
+            return ResponseBuilder::success(201, "Berhasil menambahkan mata pelajaran", [
+                'id' => $mapel->id,
+                'kode_mapel' => $mapel->kode_mapel,
+                'nama_mapel' => $mapel->nama_mapel,
+                'tingkat' => $mapel->tingkat,
+                'guru_id' => $mapel->guru_id,
+                'sekolah_id' => $mapel->sekolah_id,
+                'created_at' => $mapel->created_at,
+                'updated_at' => $mapel->updated_at,
+            ]);
         } catch (\Exception $e) {
+            DB::rollBack();
+            // Log error untuk debugging
+            \Log::error('Error saat menambahkan mata pelajaran: ' . $e->getMessage());
             return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
         }
     }

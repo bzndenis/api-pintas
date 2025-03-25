@@ -12,6 +12,9 @@ class TujuanPembelajaran extends Model
     
     protected $table = 'tujuan_pembelajaran';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'kode_tp',

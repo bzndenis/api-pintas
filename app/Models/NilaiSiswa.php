@@ -9,6 +9,9 @@ class NilaiSiswa extends Model
 {
     protected $table = 'nilai_siswa';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'siswa_id',

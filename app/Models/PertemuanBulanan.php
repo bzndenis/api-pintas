@@ -9,6 +9,9 @@ class PertemuanBulanan extends Model
 {
     protected $table = 'pertemuan_bulanan';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'kelas_id',

@@ -12,12 +12,16 @@ class MataPelajaran extends Model
     
     protected $table = 'mata_pelajaran';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'kode_mapel',
         'nama_mapel',
         'tingkat',
         'sekolah_id',
+        'guru_id',
     ];
     
     protected $casts = [

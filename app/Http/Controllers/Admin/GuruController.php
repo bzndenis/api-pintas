@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Str;
+use App\Models\MataPelajaran;
 
 class GuruController extends Controller
 {
@@ -76,8 +77,8 @@ class GuruController extends Controller
                 'role' => 'guru',
                 'is_active' => true,
                 'sekolah_id' => $admin->sekolah_id,
-                'nama_lengkap' => $request->nama,
-                'no_telepon' => $request->no_telp
+                'fullname' => $request->nama,
+                'no_telp' => $request->no_telp
             ]);
 
             // Buat data guru
@@ -92,7 +93,9 @@ class GuruController extends Controller
 
             // Assign mata pelajaran jika ada
             if ($request->has('mata_pelajaran') && is_array($request->mata_pelajaran)) {
-                $guru->mataPelajaran()->attach($request->mata_pelajaran);
+                // Update guru_id pada setiap mata pelajaran yang dipilih
+                MataPelajaran::whereIn('id', $request->mata_pelajaran)
+                    ->update(['guru_id' => $guru->id]);
             }
 
             DB::commit();
@@ -140,14 +143,24 @@ class GuruController extends Controller
             // Update data user
             $guru->user->update([
                 'email' => $request->email,
-                'nama_lengkap' => $request->nama,
-                'no_telepon' => $request->no_telp,
+                'fullname' => $request->nama,
+                'no_telp' => $request->no_telp,
                 'is_active' => $request->has('is_active') ? $request->is_active : $guru->user->is_active
             ]);
             
             // Update mata pelajaran jika ada
             if ($request->has('mata_pelajaran')) {
-                $guru->mataPelajaran()->sync($request->mata_pelajaran);
+                // Dapatkan mata pelajaran yang saat ini diajar oleh guru
+                $currentMapel = MataPelajaran::where('guru_id', $guru->id)->pluck('id')->toArray();
+                
+                // Mata pelajaran yang akan ditambahkan (ada dalam daftar baru)
+                $mapelToAdd = array_diff($request->mata_pelajaran, $currentMapel);
+                
+                // Update guru_id untuk mata pelajaran yang baru
+                if (!empty($mapelToAdd)) {
+                    MataPelajaran::whereIn('id', $mapelToAdd)
+                        ->update(['guru_id' => $guru->id]);
+                }
             }
             
             DB::commit();
@@ -227,8 +240,8 @@ class GuruController extends Controller
                     'role' => 'guru',
                     'is_active' => true,
                     'sekolah_id' => $admin->sekolah_id,
-                    'nama_lengkap' => $nama,
-                    'no_telepon' => $noTelp
+                    'fullname' => $nama,
+                    'no_telp' => $noTelp
                 ]);
                 
                 // Buat data guru
@@ -416,10 +429,10 @@ class GuruController extends Controller
                         'role' => 'guru',
                         'is_active' => true,
                         'sekolah_id' => $admin->sekolah_id,
-                        'nama_lengkap' => $data['nama'],
-                        'no_telepon' => $data['no_telp'] ?? null,
+                        'fullname' => $data['nama'],
                         'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
+                        'updated_at' => Carbon::now(),
+                        'username' => $data['email'] // Tambahkan username karena ini wajib di tabel users
                     ]);
                     
                     \Log::info('User created with ID: ' . $userId);

@@ -9,6 +9,9 @@ class Setting extends Model
 {
     protected $table = 'settings';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'key',

@@ -9,6 +9,9 @@ class AbsensiSiswa extends Model
 {
     protected $table = 'absensi_siswa';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'siswa_id',

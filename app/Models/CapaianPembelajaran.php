@@ -12,6 +12,9 @@ class CapaianPembelajaran extends Model
     
     protected $table = 'capaian_pembelajaran';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'kode_cp',

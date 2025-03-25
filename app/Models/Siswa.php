@@ -12,6 +12,9 @@ class Siswa extends Model
     
     protected $table = 'siswa';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'nis',

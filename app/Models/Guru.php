@@ -12,6 +12,9 @@ class Guru extends Model
     
     protected $table = 'guru';
     
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
     protected $fillable = [
         'id',
         'nip',
@@ -56,5 +59,10 @@ class Guru extends Model
     public function kelas()
     {
         return $this->hasMany(Kelas::class);
+    }
+    
+    public function mataPelajaran()
+    {
+        return $this->hasMany(MataPelajaran::class, 'guru_id');
     }
 } 
