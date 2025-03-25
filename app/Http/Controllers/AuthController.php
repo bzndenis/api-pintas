@@ -18,11 +18,11 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $this->validate($request, [
-            'nama_lengkap' => 'required|string|max:255',
             'email' => 'required|unique:users|max:255',
             'no_telepon' => 'required|string|max:15',
             'sekolah' => 'required|string|max:255',
             'alamat_sekolah' => 'required|string',
+            'username' => 'required|string|max:50|unique:users,username',
             'password' => 'required|min:6',
             'konfirmasi_password' => 'required|same:password'
         ]);
@@ -47,7 +47,7 @@ class AuthController extends Controller
                 'kode_pos' => '12345',
                 'no_telp' => $request->input('no_telepon'),
                 'email' => $request->input('email'),
-                'kepala_sekolah' => $request->input('nama_lengkap'),
+                'kepala_sekolah' => $request->input('username'),
                 'is_active' => 1,
                 'created_at' => \Carbon\Carbon::now(),
                 'updated_at' => \Carbon\Carbon::now()
@@ -65,9 +65,8 @@ class AuthController extends Controller
                 'password' => Hash::make($request->input('password')),
                 'role' => 'admin',
                 'sekolah_id' => $sekolahId,
-                'nama_lengkap' => $request->input('nama_lengkap'),
-                'no_telepon' => $request->input('no_telepon'),
-                'alamat_sekolah' => $request->input('alamat_sekolah'),
+                'username' => strtolower(str_replace(' ', '', $request->input('username'))),
+                'fullname' => $request->input('username'),
                 'is_active' => 1,
                 'created_at' => \Carbon\Carbon::now(),
                 'updated_at' => \Carbon\Carbon::now()
@@ -145,6 +144,7 @@ class AuthController extends Controller
                     'user_id' => $user->id,
                     'login_time' => $loginTime,
                     'last_activity' => $loginTime,
+                    'duration' => 0,
                     'status' => 'active',
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->header('User-Agent'),
@@ -158,6 +158,7 @@ class AuthController extends Controller
                     'action' => 'login',
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->header('User-Agent'),
+                    'duration' => 0,
                     'sekolah_id' => $user->sekolah_id,
                     'created_at' => $loginTime,
                     'updated_at' => $loginTime
@@ -266,6 +267,7 @@ class AuthController extends Controller
                 'action' => 'logout',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->header('User-Agent'),
+                'duration' => 0,
                 'sekolah_id' => $user->sekolah_id,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
