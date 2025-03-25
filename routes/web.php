@@ -1229,7 +1229,10 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 });
 
 // Tambahkan route untuk heartbeat
-$router->post('/activity/heartbeat', 'ActivityController@heartbeat');
+$router->post('/activity/heartbeat', [
+    'middleware' => 'login',
+    'uses' => 'ActivityController@heartbeat'
+]);
 
 // API Mobile - Guru Routes
 // $router->group(['prefix' => 'api/guru', 'middleware' => 'login'], function () use ($router) {

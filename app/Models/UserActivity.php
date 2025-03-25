@@ -15,6 +15,7 @@ class UserActivity extends Model
         'action',
         'ip_address',
         'user_agent',
+        'duration',
         'sekolah_id',
         'created_at',
         'updated_at'
@@ -31,12 +32,17 @@ class UserActivity extends Model
         'updated_at',
     ];
     
-    public static function boot()
+    public $incrementing = false;
+    protected $keyType = 'string';
+    
+    protected static function boot()
     {
         parent::boot();
         
         static::creating(function ($model) {
-            $model->id = Uuid::uuid4()->toString();
+            if (!$model->id) {
+                $model->id = Uuid::uuid4()->toString();
+            }
         });
     }
     
@@ -47,6 +53,6 @@ class UserActivity extends Model
     
     public function sekolah()
     {
-        return $this->belongsTo(Sekolah::class);
+        return $this->belongsTo(Sekolah::class, 'sekolah_id');
     }
 } 
