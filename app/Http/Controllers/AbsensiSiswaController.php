@@ -11,6 +11,7 @@ use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class AbsensiSiswaController extends Controller
 {
@@ -21,155 +22,181 @@ class AbsensiSiswaController extends Controller
 
     public function index(Request $request)
     {
-        try {
-            $query = AbsensiSiswa::with([
-                'siswa.kelas',
-                'pertemuan',
-                'sekolah'
-            ]);
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
+        
+        $query = AbsensiSiswa::with(['siswa', 'pertemuan'])
+            ->where('sekolah_id', $sekolahId);
             
-            if ($request->siswa_id) {
-                $query->where('siswa_id', $request->siswa_id);
-            }
-
-            if ($request->pertemuan_id) {
-                $query->where('pertemuan_id', $request->pertemuan_id);
-            }
-
-            if ($request->sekolah_id) {
-                $query->where('sekolah_id', $request->sekolah_id);
-            }
-
-            $absensi = $query->orderBy('created_at', 'desc')->get();
-
-            $formattedData = [
-                'total' => $absensi->count(),
-                'absensi_siswa' => $absensi->map(function($item) {
-                    return [
-                        'id' => $item->id,
-                        'status' => $item->status,
-                        'keterangan' => $item->keterangan,
-                        'siswa' => [
-                            'id' => $item->siswa->id,
-                            'nama' => $item->siswa->nama,
-                            'kelas' => [
-                                'id' => $item->siswa->kelas->id,
-                                'nama_kelas' => $item->siswa->kelas->nama_kelas
-                            ]
-                        ],
-                        'pertemuan' => [
-                            'id' => $item->pertemuan->id,
-                            'tanggal' => $item->pertemuan->tanggal,
-                            'pertemuan_ke' => $item->pertemuan->pertemuan_ke
-                        ],
-                        'created_at' => $item->created_at->format('Y-m-d H:i:s')
-                    ];
-                })
-            ];
-
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data", $formattedData);
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
+        // Filter berdasarkan pertemuan_id jika ada
+        if ($request->has('pertemuan_id')) {
+            $query->where('pertemuan_id', $request->pertemuan_id);
         }
+        
+        // Filter berdasarkan siswa_id jika ada
+        if ($request->has('siswa_id')) {
+            $query->where('siswa_id', $request->siswa_id);
+        }
+        
+        $absensi = $query->get();
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => $absensi
+        ]);
     }
 
     public function store(Request $request)
     {
-        $this->validate($request, [
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
+        
+        $validator = Validator::make($request->all(), [
             'siswa_id' => 'required|exists:siswa,id',
             'pertemuan_id' => 'required|exists:pertemuan_bulanan,id',
-            'status' => 'required|in:hadir,izin,sakit,alpha',
-            'keterangan' => 'nullable|string'
+            'hadir' => 'required|integer|min:0',
+            'izin' => 'required|integer|min:0',
+            'sakit' => 'required|integer|min:0',
+            'absen' => 'required|integer|min:0',
         ]);
-
-        try {
-            DB::beginTransaction();
-            
-            // Cek apakah sudah ada absensi untuk siswa dan pertemuan ini
-            $exists = AbsensiSiswa::where('siswa_id', $request->siswa_id)
-                                ->where('pertemuan_id', $request->pertemuan_id)
-                                ->exists();
-            
-            if ($exists) {
-                return ResponseBuilder::error(400, "Absensi untuk siswa ini sudah ada");
-            }
-            
-            // Ambil data siswa untuk mendapatkan sekolah_id
-            $siswa = Siswa::find($request->siswa_id);
-            
-            $absensi = AbsensiSiswa::create([
-                'siswa_id' => $request->siswa_id,
-                'pertemuan_id' => $request->pertemuan_id,
-                'status' => $request->status,
-                'keterangan' => $request->keterangan,
-                'sekolah_id' => $siswa->sekolah_id
-            ]);
-            
-            DB::commit();
-            
-            $absensi->load(['siswa.kelas', 'pertemuan', 'sekolah']);
-            
-            return ResponseBuilder::success(201, "Berhasil menambah data", $absensi);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return ResponseBuilder::error(500, "Gagal menambah data: " . $e->getMessage());
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()
+            ], 400);
         }
+        
+        // Cek apakah siswa dan pertemuan berada di sekolah yang sama dengan user
+        $siswa = Siswa::find($request->siswa_id);
+        $pertemuan = PertemuanBulanan::find($request->pertemuan_id);
+        
+        if ($siswa->sekolah_id != $sekolahId || $pertemuan->sekolah_id != $sekolahId) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Siswa atau pertemuan tidak ditemukan di sekolah ini'
+            ], 403);
+        }
+        
+        // Cek apakah sudah ada absensi untuk siswa dan pertemuan ini
+        $existingAbsensi = AbsensiSiswa::where('siswa_id', $request->siswa_id)
+            ->where('pertemuan_id', $request->pertemuan_id)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
+        if ($existingAbsensi) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Absensi untuk siswa dan pertemuan ini sudah ada'
+            ], 400);
+        }
+        
+        $absensi = new AbsensiSiswa();
+        $absensi->siswa_id = $request->siswa_id;
+        $absensi->pertemuan_id = $request->pertemuan_id;
+        $absensi->hadir = $request->hadir;
+        $absensi->izin = $request->izin;
+        $absensi->sakit = $request->sakit;
+        $absensi->absen = $request->absen;
+        $absensi->created_by = $user->id;
+        $absensi->sekolah_id = $sekolahId;
+        $absensi->save();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Absensi berhasil disimpan',
+            'data' => $absensi
+        ], 201);
     }
 
     public function show($id)
     {
-        $absensi = AbsensiSiswa::with(['siswa', 'pertemuan.kelas', 'createdBy', 'sekolah'])->find($id);
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
         
+        $absensi = AbsensiSiswa::with(['siswa', 'pertemuan'])
+            ->where('id', $id)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
         if (!$absensi) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Absensi tidak ditemukan'
+            ], 404);
         }
         
-        return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $absensi, true);
+        return response()->json([
+            'status' => 'success',
+            'data' => $absensi
+        ]);
     }
 
     public function update(Request $request, $id)
     {
-        $absensi = AbsensiSiswa::find($id);
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
         
-        if (!$absensi) {
-            return ResponseBuilder::error(404, "Data tidak ditemukan");
-        }
-
-        $this->validate($request, [
-            'status' => 'required|in:hadir,izin,sakit,alpha',
-            'keterangan' => 'nullable|string'
+        $validator = Validator::make($request->all(), [
+            'hadir' => 'required|integer|min:0',
+            'izin' => 'required|integer|min:0',
+            'sakit' => 'required|integer|min:0',
+            'absen' => 'required|integer|min:0',
         ]);
-
-        try {
-            DB::beginTransaction();
-            
-            $absensi->update($request->only(['status', 'keterangan']));
-            
-            DB::commit();
-            
-            $absensi->load(['siswa.kelas', 'pertemuan', 'sekolah']);
-            
-            return ResponseBuilder::success(200, "Berhasil mengubah data", $absensi);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return ResponseBuilder::error(500, "Gagal mengubah data: " . $e->getMessage());
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()
+            ], 400);
         }
+        
+        $absensi = AbsensiSiswa::where('id', $id)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
+        if (!$absensi) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Absensi tidak ditemukan'
+            ], 404);
+        }
+        
+        $absensi->hadir = $request->hadir;
+        $absensi->izin = $request->izin;
+        $absensi->sakit = $request->sakit;
+        $absensi->absen = $request->absen;
+        $absensi->save();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Absensi berhasil diperbarui',
+            'data' => $absensi
+        ]);
     }
 
     public function destroy($id)
     {
-        $absensi = AbsensiSiswa::find($id);
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
         
+        $absensi = AbsensiSiswa::where('id', $id)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
         if (!$absensi) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Absensi tidak ditemukan'
+            ], 404);
         }
         
-        try {
-            $absensi->delete();
-            return ResponseBuilder::success(200, "Berhasil Menghapus Data", null, true);
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal Menghapus Data: " . $e->getMessage());
-        }
+        $absensi->delete();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Absensi berhasil dihapus'
+        ]);
     }
     
     public function import(Request $request)
@@ -358,5 +385,65 @@ class AbsensiSiswaController extends Controller
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengambil rekap: " . $e->getMessage());
         }
+    }
+
+    public function getByPertemuan($pertemuanId)
+    {
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
+        
+        $pertemuan = PertemuanBulanan::where('id', $pertemuanId)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
+        if (!$pertemuan) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pertemuan tidak ditemukan'
+            ], 404);
+        }
+        
+        $absensi = AbsensiSiswa::with(['siswa'])
+            ->where('pertemuan_id', $pertemuanId)
+            ->where('sekolah_id', $sekolahId)
+            ->get();
+            
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'pertemuan' => $pertemuan,
+                'absensi' => $absensi
+            ]
+        ]);
+    }
+    
+    public function getBySiswa($siswaId)
+    {
+        $user = Auth::user();
+        $sekolahId = $user->sekolah_id;
+        
+        $siswa = Siswa::where('id', $siswaId)
+            ->where('sekolah_id', $sekolahId)
+            ->first();
+            
+        if (!$siswa) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Siswa tidak ditemukan'
+            ], 404);
+        }
+        
+        $absensi = AbsensiSiswa::with(['pertemuan'])
+            ->where('siswa_id', $siswaId)
+            ->where('sekolah_id', $sekolahId)
+            ->get();
+            
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'siswa' => $siswa,
+                'absensi' => $absensi
+            ]
+        ]);
     }
 } 

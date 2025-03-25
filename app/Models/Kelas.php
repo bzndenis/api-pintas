@@ -16,7 +16,7 @@ class Kelas extends Model
         'id',
         'nama_kelas',
         'tingkat',
-        'tahun_ajaran_id',
+        'tahun',
         'guru_id',
         'sekolah_id',
     ];
@@ -44,7 +44,7 @@ class Kelas extends Model
     
     public function tahunAjaran()
     {
-        return $this->belongsTo(TahunAjaran::class);
+        return $this->belongsTo(TahunAjaran::class, 'tahun', 'nama_tahun_ajaran');
     }
     
     public function guru()

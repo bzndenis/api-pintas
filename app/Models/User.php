@@ -17,17 +17,15 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
     
     protected $fillable = [
         'id',
-        'email',
+        'username',
         'password', 
+        'fullname',
+        'email',
         'role',
         'sekolah_id',
-        'nama_lengkap',
-        'no_telepon',
-        'alamat_sekolah',
         'last_login',
         'is_active',
-        'remember_token',
-        'api_token'
+        'remember_token'
     ];
     
     protected $hidden = [
@@ -80,5 +78,20 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
     public function sessions()
     {
         return $this->hasMany(UserSession::class);
+    }
+
+    public function createdAbsensi()
+    {
+        return $this->hasMany(AbsensiSiswa::class, 'created_by');
+    }
+
+    public function createdNilai()
+    {
+        return $this->hasMany(NilaiSiswa::class, 'created_by');
+    }
+
+    public function createdPertemuan()
+    {
+        return $this->hasMany(PertemuanBulanan::class, 'created_by');
     }
 }

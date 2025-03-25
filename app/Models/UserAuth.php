@@ -17,13 +17,13 @@ class UserAuth extends Model implements AuthenticatableContract, AuthorizableCon
     protected $table = 'users';
 
     protected $fillable = [
-        'email',
+        'id',
+        'username',
         'password', 
+        'fullname',
+        'email',
         'role',
         'sekolah_id',
-        'nama_lengkap',
-        'no_telepon',
-        'alamat_sekolah',
         'last_login',
         'is_active',
         'remember_token'

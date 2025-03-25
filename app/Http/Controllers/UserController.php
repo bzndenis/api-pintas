@@ -13,6 +13,8 @@ use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Ramsey\Uuid\Uuid;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
@@ -24,22 +26,32 @@ class UserController extends Controller
     public function index(Request $request)
     {
         try {
+            $user = Auth::user();
             $role = $request->query('role');
-            $sekolahId = $request->sekolah_id; // Menggunakan sekolah_id dari middleware
             
             $query = UserAuth::with(['sekolah', 'guru']);
             
-            // Filter berdasarkan role
-            if ($role) {
-                $query->where('role', $role);
+            // Super admin dapat melihat semua user
+            if ($user->role === 'super_admin') {
+                // Filter berdasarkan role
+                if ($role) {
+                    $query->where('role', $role);
+                }
+                
+                // Filter berdasarkan sekolah
+                if ($request->has('sekolah_id')) {
+                    $query->where('sekolah_id', $request->sekolah_id);
+                }
+            } else {
+                // Admin dan guru hanya dapat melihat user di sekolah mereka
+                $query->where('sekolah_id', $user->sekolah_id);
+                
+                // Filter berdasarkan role
+                if ($role) {
+                    $query->where('role', $role);
+                }
             }
             
-            // Filter berdasarkan sekolah
-            if ($sekolahId) {
-                $query->where('sekolah_id', $sekolahId);
-            }
-            
-            // Ubah get() menjadi paginate() untuk mendapatkan collection yang bisa dihitung
             $users = $query->orderBy('created_at', 'desc')->get();
             
             // Format response data
@@ -48,8 +60,9 @@ class UserController extends Controller
                 'users' => $users->map(function($user) {
                     return [
                         'id' => $user->id,
+                        'username' => $user->username,
                         'email' => $user->email,
-                        'nama_lengkap' => $user->nama_lengkap,
+                        'fullname' => $user->fullname,
                         'role' => $user->role,
                         'no_telepon' => $user->no_telepon,
                         'last_login' => $user->last_login,
@@ -74,73 +87,103 @@ class UserController extends Controller
             
             return ResponseBuilder::success(200, "Berhasil Mendapatkan Data", $formattedData);
         } catch (\Exception $e) {
-            \Log::error('Gagal mengambil data user: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
-            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal Mendapatkan Data: " . $e->getMessage());
         }
     }
 
     public function store(Request $request)
     {
-        $this->validate($request, [
-            'email' => 'required|unique:users|max:255',
-            'password' => 'required|min:6',
+        $user = Auth::user();
+        
+        // Validasi input
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string|unique:users,username',
+            'password' => 'required|string|min:6',
+            'fullname' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
             'role' => 'required|in:super_admin,admin,guru',
             'sekolah_id' => 'nullable|required_if:role,admin,guru|exists:sekolah,id',
-            'nama_lengkap' => 'required|string|max:255',
             'no_telepon' => 'nullable|string|max:20',
-            'alamat_sekolah' => 'nullable|string'
         ]);
-
+        
+        if ($validator->fails()) {
+            return ResponseBuilder::error(400, "Validasi gagal", $validator->errors());
+        }
+        
         try {
             DB::beginTransaction();
             
-            $user = User::create([
-                'email' => $request->email,
+            // Super admin hanya dapat dibuat oleh super admin
+            if ($request->role === 'super_admin' && $user->role !== 'super_admin') {
+                return ResponseBuilder::error(403, "Anda tidak memiliki izin untuk membuat super admin");
+            }
+            
+            // Admin hanya dapat membuat user di sekolahnya sendiri
+            if ($user->role === 'admin' && $request->sekolah_id !== $user->sekolah_id) {
+                return ResponseBuilder::error(403, "Anda hanya dapat membuat user di sekolah Anda sendiri");
+            }
+            
+            $userData = [
+                'username' => $request->username,
                 'password' => Hash::make($request->password),
+                'fullname' => $request->fullname,
+                'email' => $request->email,
                 'role' => $request->role,
                 'sekolah_id' => $request->sekolah_id,
-                'nama_lengkap' => $request->nama_lengkap,
                 'no_telepon' => $request->no_telepon,
-                'alamat_sekolah' => $request->alamat_sekolah,
                 'is_active' => $request->input('is_active', true)
-            ]);
+            ];
+            
+            $newUser = User::create($userData);
             
             // Jika role adalah guru, buat data guru
             if ($request->role === 'guru' && $request->sekolah_id) {
-                $user->guru()->create([
-                    'nama' => $request->nama_lengkap,
+                $guru = Guru::create([
+                    'nama' => $request->fullname,
                     'email' => $request->email,
                     'nip' => $request->input('nip'),
                     'no_telp' => $request->no_telepon,
+                    'user_id' => $newUser->id,
                     'sekolah_id' => $request->sekolah_id
                 ]);
+                
+                // Assign mata pelajaran jika ada
+                if ($request->has('mata_pelajaran') && is_array($request->mata_pelajaran)) {
+                    $guru->mataPelajaran()->attach($request->mata_pelajaran);
+                }
             }
             
             DB::commit();
             
-            return ResponseBuilder::success(201, "Berhasil Menambahkan Data", $user, true);
+            $newUser->load(['sekolah', 'guru']);
+            
+            return ResponseBuilder::success(201, "Berhasil membuat user baru", $newUser);
         } catch (\Exception $e) {
             DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal Menambahkan Data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal membuat user: " . $e->getMessage());
         }
     }
 
     public function show($id)
     {
+        $user = Auth::user();
+        
         try {
-            // Validasi format UUID
-            if (!Uuid::isValid($id)) {
-                return ResponseBuilder::error(400, "Format ID tidak valid");
-            }
-
-            $user = User::with(['sekolah', 'guru'])->find($id);
+            $userData = User::with(['sekolah', 'guru'])->find($id);
             
-            if (!$user) {
-                return ResponseBuilder::error(404, "Data user tidak ditemukan");
+            if (!$userData) {
+                return ResponseBuilder::error(404, "User tidak ditemukan");
             }
             
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data user", ['user' => $user]);
+            // Super admin dapat melihat semua user
+            if ($user->role !== 'super_admin') {
+                // Admin dan guru hanya dapat melihat user di sekolah mereka
+                if ($userData->sekolah_id !== $user->sekolah_id) {
+                    return ResponseBuilder::error(403, "Anda tidak memiliki izin untuk melihat user ini");
+                }
+            }
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan detail user", $userData);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
@@ -148,190 +191,272 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
+        $user = Auth::user();
+        
         try {
-            // Validasi format UUID
-            if (!Uuid::isValid($id)) {
-                return ResponseBuilder::error(400, "Format ID tidak valid");
-            }
-
-            $user = User::find($id);
+            $userData = User::find($id);
             
-            if (!$user) {
-                return ResponseBuilder::error(404, "Data user tidak ditemukan");
+            if (!$userData) {
+                return ResponseBuilder::error(404, "User tidak ditemukan");
             }
             
-            $this->validate($request, [
-                'email' => 'sometimes|required|unique:users,email,'.$id.',id|max:255',
-                'role' => 'sometimes|required|in:super_admin,admin,guru',
-                'sekolah_id' => 'nullable|required_if:role,admin,guru|exists:sekolah,id',
-                'nama_lengkap' => 'sometimes|required|string|max:255',
-                'no_telepon' => 'nullable|string|max:20',
-                'alamat_sekolah' => 'nullable|string'
-            ]);
-            
-            DB::beginTransaction();
-            
-            $updateData = $request->only([
-                'email', 'role', 'sekolah_id', 'is_active', 'nama_lengkap', 'no_telepon', 'alamat_sekolah'
-            ]);
-            
-            // Update password jika ada
-            if ($request->has('password') && $request->password) {
-                $updateData['password'] = Hash::make($request->password);
-            }
-            
-            $user->update($updateData);
-            
-            // Update atau buat data guru jika rolenya guru
-            if ($user->role === 'guru' && $user->sekolah_id) {
-                $guru = $user->guru;
+            // Super admin dapat mengupdate semua user
+            if ($user->role === 'super_admin') {
+                $validator = Validator::make($request->all(), [
+                    'username' => 'sometimes|required|string|unique:users,username,'.$id,
+                    'password' => 'nullable|string|min:6',
+                    'fullname' => 'sometimes|required|string|max:255',
+                    'email' => 'sometimes|required|email|unique:users,email,'.$id,
+                    'role' => 'sometimes|required|in:super_admin,admin,guru',
+                    'sekolah_id' => 'nullable|required_if:role,admin,guru|exists:sekolah,id',
+                    'no_telepon' => 'nullable|string|max:20',
+                    'is_active' => 'nullable|boolean'
+                ]);
+                
+                if ($validator->fails()) {
+                    return ResponseBuilder::error(400, "Validasi gagal", $validator->errors());
+                }
+                
+                DB::beginTransaction();
+                
+                $updateData = $request->only([
+                    'username', 'fullname', 'email', 'role', 'sekolah_id', 'no_telepon', 'is_active'
+                ]);
+                
+                // Update password jika ada
+                if ($request->has('password') && $request->password) {
+                    $updateData['password'] = Hash::make($request->password);
+                }
+                
+                $userData->update($updateData);
+                
+                // Update atau buat data guru jika rolenya guru
+                if ($userData->role === 'guru') {
+                    $guru = Guru::where('user_id', $userData->id)->first();
+                    
+                    if ($guru) {
+                        $guru->update([
+                            'nama' => $userData->fullname,
+                            'email' => $userData->email,
+                            'no_telp' => $userData->no_telepon,
+                            'sekolah_id' => $userData->sekolah_id
+                        ]);
+                        
+                        // Update NIP jika ada
+                        if ($request->has('nip')) {
+                            $guru->update(['nip' => $request->nip]);
+                        }
+                        
+                        // Update mata pelajaran jika ada
+                        if ($request->has('mata_pelajaran')) {
+                            $guru->mataPelajaran()->sync($request->mata_pelajaran);
+                        }
+                    } else {
+                        $guru = Guru::create([
+                            'nama' => $userData->fullname,
+                            'email' => $userData->email,
+                            'nip' => $request->input('nip'),
+                            'no_telp' => $userData->no_telepon,
+                            'user_id' => $userData->id,
+                            'sekolah_id' => $userData->sekolah_id
+                        ]);
+                        
+                        // Assign mata pelajaran jika ada
+                        if ($request->has('mata_pelajaran') && is_array($request->mata_pelajaran)) {
+                            $guru->mataPelajaran()->attach($request->mata_pelajaran);
+                        }
+                    }
+                }
+                
+                DB::commit();
+            } else if ($user->role === 'admin') {
+                // Admin hanya dapat mengupdate user di sekolahnya sendiri
+                if ($userData->sekolah_id !== $user->sekolah_id) {
+                    return ResponseBuilder::error(403, "Anda hanya dapat mengupdate user di sekolah Anda sendiri");
+                }
+                
+                $validator = Validator::make($request->all(), [
+                    'username' => 'sometimes|required|string|unique:users,username,'.$id,
+                    'password' => 'nullable|string|min:6',
+                    'fullname' => 'sometimes|required|string|max:255',
+                    'email' => 'sometimes|required|email|unique:users,email,'.$id,
+                    'role' => 'sometimes|required|in:admin,guru',
+                    'no_telepon' => 'nullable|string|max:20',
+                    'is_active' => 'nullable|boolean'
+                ]);
+                
+                if ($validator->fails()) {
+                    return ResponseBuilder::error(400, "Validasi gagal", $validator->errors());
+                }
+                
+                DB::beginTransaction();
+                
+                $updateData = $request->only([
+                    'username', 'fullname', 'email', 'role', 'no_telepon', 'is_active'
+                ]);
+                
+                // Admin tidak dapat mengubah sekolah_id
+                $updateData['sekolah_id'] = $userData->sekolah_id;
+                
+                // Update password jika ada
+                if ($request->has('password') && $request->password) {
+                    $updateData['password'] = Hash::make($request->password);
+                }
+                
+                $userData->update($updateData);
+                
+                // Update atau buat data guru jika rolenya guru
+                if ($userData->role === 'guru') {
+                    $guru = Guru::where('user_id', $userData->id)->first();
+                    
+                    if ($guru) {
+                        $guru->update([
+                            'nama' => $userData->fullname,
+                            'email' => $userData->email,
+                            'no_telp' => $userData->no_telepon
+                        ]);
+                        
+                        // Update NIP jika ada
+                        if ($request->has('nip')) {
+                            $guru->update(['nip' => $request->nip]);
+                        }
+                        
+                        // Update mata pelajaran jika ada
+                        if ($request->has('mata_pelajaran')) {
+                            $guru->mataPelajaran()->sync($request->mata_pelajaran);
+                        }
+                    } else {
+                        $guru = Guru::create([
+                            'nama' => $userData->fullname,
+                            'email' => $userData->email,
+                            'nip' => $request->input('nip'),
+                            'no_telp' => $userData->no_telepon,
+                            'user_id' => $userData->id,
+                            'sekolah_id' => $userData->sekolah_id
+                        ]);
+                        
+                        // Assign mata pelajaran jika ada
+                        if ($request->has('mata_pelajaran') && is_array($request->mata_pelajaran)) {
+                            $guru->mataPelajaran()->attach($request->mata_pelajaran);
+                        }
+                    }
+                }
+                
+                DB::commit();
+            } else {
+                // Guru hanya dapat mengupdate dirinya sendiri
+                if ($user->id != $id) {
+                    return ResponseBuilder::error(403, "Anda hanya dapat mengupdate data diri sendiri");
+                }
+                
+                $validator = Validator::make($request->all(), [
+                    'username' => 'sometimes|required|string|unique:users,username,'.$id,
+                    'password' => 'nullable|string|min:6',
+                    'fullname' => 'sometimes|required|string|max:255',
+                    'email' => 'sometimes|required|email|unique:users,email,'.$id,
+                    'no_telepon' => 'nullable|string|max:20'
+                ]);
+                
+                if ($validator->fails()) {
+                    return ResponseBuilder::error(400, "Validasi gagal", $validator->errors());
+                }
+                
+                DB::beginTransaction();
+                
+                $updateData = $request->only([
+                    'username', 'fullname', 'email', 'no_telepon'
+                ]);
+                
+                // Guru tidak dapat mengubah role dan sekolah_id
+                $updateData['role'] = $userData->role;
+                $updateData['sekolah_id'] = $userData->sekolah_id;
+                $updateData['is_active'] = $userData->is_active;
+                
+                // Update password jika ada
+                if ($request->has('password') && $request->password) {
+                    $updateData['password'] = Hash::make($request->password);
+                }
+                
+                $userData->update($updateData);
+                
+                // Update data guru
+                $guru = Guru::where('user_id', $userData->id)->first();
                 
                 if ($guru) {
                     $guru->update([
-                        'nama' => $request->nama_lengkap,
-                        'email' => $user->email,
-                        'nip' => $request->input('nip'),
-                        'no_telp' => $request->no_telepon,
-                        'sekolah_id' => $user->sekolah_id
-                    ]);
-                } else {
-                    $user->guru()->create([
-                        'nama' => $request->nama_lengkap,
-                        'email' => $user->email,
-                        'nip' => $request->input('nip'),
-                        'no_telp' => $request->no_telepon,
-                        'sekolah_id' => $user->sekolah_id
+                        'nama' => $userData->fullname,
+                        'email' => $userData->email,
+                        'no_telp' => $userData->no_telepon
                     ]);
                 }
+                
+                DB::commit();
             }
             
-            DB::commit();
+            $userData->load(['sekolah', 'guru']);
             
-            return ResponseBuilder::success(200, "Berhasil Mengubah Data", $user, true);
+            return ResponseBuilder::success(200, "Berhasil mengupdate user", $userData);
         } catch (\Exception $e) {
             DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal Mengubah Data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengupdate user: " . $e->getMessage());
         }
     }
 
     public function destroy($id)
     {
-        $user = User::find($id);
-        
-        if (!$user) {
-            return ResponseBuilder::error(404, "Data Tidak ada");
-        }
+        $user = Auth::user();
         
         try {
-            $user->delete();
-            return ResponseBuilder::success(200, "Berhasil Menghapus Data", null, true);
-        } catch (\Exception $e) {
-            return ResponseBuilder::error(500, "Gagal Menghapus Data: " . $e->getMessage());
-        }
-    }
-
-    public function pagenationUser(Request $request)
-    {
-        $page = $request->input('page', 1);
-        $limit = $request->input('limit', 10);
-        $offset = ($page - 1) * $limit;
-        $role = $request->input('role');
-        $sekolahId = $request->input('sekolah_id');
-        $search = $request->input('search');
-        
-        $query = User::with('sekolah');
-        
-        // Filter berdasarkan role jika ada
-        if ($role) {
-            $query->where('role', $role);
-        }
-        
-        // Filter berdasarkan sekolah jika ada
-        if ($sekolahId) {
-            $query->where('sekolah_id', $sekolahId);
-        }
-        
-        // Pencarian berdasarkan nama_lengkap atau email
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('nama_lengkap', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-        
-        $users = $query->orderBy('created_at', 'desc')->paginate($limit);
-        $total_user = $users->total();
-        $total_pages = $users->lastPage();
-
-        $data = $users->items();
-
-        return response()->json([
-            "isSuccess" => true,
-            "statusCode" => 200,
-            "responseMessage" => "Success",
-            "query" => [
-                "page" => $page,
-                "limit" => $limit,
-                "offset" => $offset,
-                "count" => $total_user,
-                "total_pages" => $total_pages
-            ],
-            "data" => $data,
-            "recordsFiltered" => $total_user,
-            "recordsTotal" => $total_user
-        ]);
-    }
-
-    public function changePassword(Request $request)
-    {
-        try {
-            $this->validate($request, [
-                'password_lama' => 'required',
-                'password_baru' => 'required|min:6',
-                'konfirmasi_password' => 'required|same:password_baru'
-            ]);
-
-            $userId = $request->user_id; // Dari middleware
-            $user = UserAuth::find($userId);
-
-            if (!$user) {
+            $userData = User::find($id);
+            
+            if (!$userData) {
                 return ResponseBuilder::error(404, "User tidak ditemukan");
             }
-
-            if (!Hash::check($request->password_lama, $user->password)) {
-                return ResponseBuilder::error(401, "Password lama tidak sesuai");
+            
+            // Super admin dapat menghapus semua user kecuali dirinya sendiri
+            if ($user->role === 'super_admin') {
+                if ($user->id == $id) {
+                    return ResponseBuilder::error(400, "Anda tidak dapat menghapus akun Anda sendiri");
+                }
+            } else if ($user->role === 'admin') {
+                // Admin hanya dapat menghapus user di sekolahnya sendiri dan bukan dirinya sendiri
+                if ($userData->sekolah_id !== $user->sekolah_id) {
+                    return ResponseBuilder::error(403, "Anda hanya dapat menghapus user di sekolah Anda sendiri");
+                }
+                
+                if ($user->id == $id) {
+                    return ResponseBuilder::error(400, "Anda tidak dapat menghapus akun Anda sendiri");
+                }
+                
+                // Admin tidak dapat menghapus super admin
+                if ($userData->role === 'super_admin') {
+                    return ResponseBuilder::error(403, "Anda tidak memiliki izin untuk menghapus super admin");
+                }
+            } else {
+                // Guru tidak dapat menghapus user
+                return ResponseBuilder::error(403, "Anda tidak memiliki izin untuk menghapus user");
             }
-
+            
             DB::beginTransaction();
             
-            // Update password
-            $user->update([
-                'password' => Hash::make($request->password_baru)
-            ]);
-
-            // Catat aktivitas
-            DB::table('user_activities')->insert([
-                'id' => Uuid::uuid4()->toString(),
-                'user_id' => $user->id,
-                'action' => 'change_password',
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->header('User-Agent'),
-                'sekolah_id' => $user->sekolah_id,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ]);
-
+            // Hapus data guru jika ada
+            if ($userData->guru) {
+                $userData->guru->delete();
+            }
+            
+            // Hapus user
+            $userData->delete();
+            
             DB::commit();
-            return ResponseBuilder::success(200, "Password berhasil diubah");
-
+            
+            return ResponseBuilder::success(200, "Berhasil menghapus user");
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Gagal mengubah password: ' . $e->getMessage());
-            return ResponseBuilder::error(500, "Gagal mengubah password: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal menghapus user: " . $e->getMessage());
         }
     }
-    
-    public function getUserProfile(Request $request)
+
+    public function profile(Request $request)
     {
         try {
             $token = $request->header('Authorization');
@@ -357,8 +482,9 @@ class UserController extends Controller
             // Format response data
             $userData = [
                 'id' => $user->id,
+                'username' => $user->username,
                 'email' => $user->email,
-                'nama_lengkap' => $user->nama_lengkap,
+                'fullname' => $user->fullname,
                 'role' => $user->role,
                 'no_telepon' => $user->no_telepon,
                 'last_login' => $user->last_login,

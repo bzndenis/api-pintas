@@ -50,4 +50,9 @@ class MataPelajaran extends Model
     {
         return $this->hasMany(CapaianPembelajaran::class, 'mapel_id');
     }
+    
+    public function guru()
+    {
+        return $this->belongsTo(Guru::class);
+    }
 } 
