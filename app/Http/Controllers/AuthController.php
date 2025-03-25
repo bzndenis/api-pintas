@@ -151,7 +151,7 @@ class AuthController extends Controller
                     'sekolah_id' => $user->sekolah_id
                 ]);
 
-                // Catat aktivitas login
+                // Catat aktivitas login dengan durasi awal 0
                 DB::table('user_activities')->insert([
                     'id' => Uuid::uuid4()->toString(),
                     'user_id' => $user->id,
@@ -249,6 +249,17 @@ class AuthController extends Controller
             $user->remember_token = null;
             $user->save();
             
+            // Hitung total durasi sesi
+            $session = DB::table('user_sessions')
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->first();
+                
+            $sessionDuration = 0;
+            if ($session) {
+                $sessionDuration = Carbon::now()->diffInSeconds(Carbon::parse($session->login_time));
+            }
+            
             // Update status sesi menjadi expired
             DB::table('user_sessions')
                 ->where('user_id', $user->id)
@@ -256,25 +267,22 @@ class AuthController extends Controller
                 ->update([
                     'status' => 'expired',
                     'last_activity' => Carbon::now(),
-                    'duration' => DB::raw('TIMESTAMPDIFF(SECOND, login_time, NOW())'),
+                    'duration' => $sessionDuration,
                     'updated_at' => Carbon::now()
                 ]);
                 
-            // Catat aktivitas logout dengan user_id yang valid
+            // Catat aktivitas logout dengan durasi sesi
             $activityData = [
                 'id' => Uuid::uuid4()->toString(),
                 'user_id' => $user->id,
                 'action' => 'logout',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->header('User-Agent'),
-                'duration' => 0,
+                'duration' => $sessionDuration,
                 'sekolah_id' => $user->sekolah_id,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
             ];
-            
-            // Debug activity data
-            \Log::info('Activity data yang akan disimpan:', $activityData);
             
             DB::table('user_activities')->insert($activityData);
             

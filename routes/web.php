@@ -959,271 +959,277 @@ $router->group(['prefix' => 'auth'], function () use ($router) {
     $router->post('/logout', 'AuthController@logout');
 });
 
-// Tambahkan route group untuk admin dashboard
-$router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], function () use ($router) {
-    // Dashboard
-    $router->get('/dashboard', 'Admin\DashboardController@index');
-    
-    // Manajemen Tahun Ajaran
-    $router->get('/tahun-ajaran', 'Admin\TahunAjaranController@index');
-    $router->post('/tahun-ajaran', 'Admin\TahunAjaranController@store');
-    $router->put('/tahun-ajaran/{id}', 'Admin\TahunAjaranController@update');
-    $router->put('/tahun-ajaran/{id}/activate', 'Admin\TahunAjaranController@activate');
-    $router->delete('/tahun-ajaran/{id}', 'Admin\TahunAjaranController@destroy');
-    
-    // Manajemen Data Master
-    $router->group(['prefix' => 'master'], function () use ($router) {
-        // Mata Pelajaran
-        $router->get('/mapel', 'Admin\MataPelajaranController@index');
-        $router->post('/mapel', 'Admin\MataPelajaranController@store');
-        $router->post('/mapel/batch', 'Admin\MataPelajaranController@storeBatch');
-        $router->put('/mapel/{id}', 'Admin\MataPelajaranController@update');
-        $router->delete('/mapel/{id}', 'Admin\MataPelajaranController@destroy');
+// Tambahkan middleware activity.tracker ke grup route yang memerlukan login
+$router->group(['middleware' => ['login', 'activity.tracker']], function () use ($router) {
+    // Tambahkan route group untuk admin dashboard
+    $router->group(['prefix' => 'admin', 'middleware' => ['login', 'admin']], function () use ($router) {
+        // Dashboard
+        $router->get('/dashboard', 'Admin\DashboardController@index');
         
-        // Tambahkan endpoint untuk ekspor template mapel
-        $router->get('/mapel/template', 'Admin\MataPelajaranController@getTemplate');
-        // Tambahkan endpoint untuk impor mapel
-        $router->post('/mapel/import', 'Admin\MataPelajaranController@import');
+        // Manajemen Tahun Ajaran
+        $router->get('/tahun-ajaran', 'Admin\TahunAjaranController@index');
+        $router->post('/tahun-ajaran', 'Admin\TahunAjaranController@store');
+        $router->put('/tahun-ajaran/{id}', 'Admin\TahunAjaranController@update');
+        $router->put('/tahun-ajaran/{id}/activate', 'Admin\TahunAjaranController@activate');
+        $router->delete('/tahun-ajaran/{id}', 'Admin\TahunAjaranController@destroy');
         
-        // Capaian Pembelajaran
-        $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
-        $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
-        $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
-        $router->delete('/cp/{id}', 'Admin\CapaianPembelajaranController@destroy');
-        $router->post('/cp/batch', 'Admin\CapaianPembelajaranController@storeBatch');
+        // Manajemen Data Master
+        $router->group(['prefix' => 'master'], function () use ($router) {
+            // Mata Pelajaran
+            $router->get('/mapel', 'Admin\MataPelajaranController@index');
+            $router->post('/mapel', 'Admin\MataPelajaranController@store');
+            $router->post('/mapel/batch', 'Admin\MataPelajaranController@storeBatch');
+            $router->put('/mapel/{id}', 'Admin\MataPelajaranController@update');
+            $router->delete('/mapel/{id}', 'Admin\MataPelajaranController@destroy');
+            
+            // Tambahkan endpoint untuk ekspor template mapel
+            $router->get('/mapel/template', 'Admin\MataPelajaranController@getTemplate');
+            // Tambahkan endpoint untuk impor mapel
+            $router->post('/mapel/import', 'Admin\MataPelajaranController@import');
+            
+            // Capaian Pembelajaran
+            $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
+            $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
+            $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
+            $router->delete('/cp/{id}', 'Admin\CapaianPembelajaranController@destroy');
+            $router->post('/cp/batch', 'Admin\CapaianPembelajaranController@storeBatch');
+            
+            // Tujuan Pembelajaran
+            $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
+            $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
+            $router->put('/tp/{id}', 'Admin\TujuanPembelajaranController@update');
+            $router->delete('/tp/{id}', 'Admin\TujuanPembelajaranController@destroy');
+        });
         
-        // Tujuan Pembelajaran
-        $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
-        $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
-        $router->put('/tp/{id}', 'Admin\TujuanPembelajaranController@update');
-        $router->delete('/tp/{id}', 'Admin\TujuanPembelajaranController@destroy');
-    });
-    
-    // Manajemen Guru
-    $router->get('/guru', 'Admin\GuruController@index');
-    $router->post('/guru', 'Admin\GuruController@store');
-    $router->post('/guru/batch', 'Admin\GuruController@storeBatch');
-    $router->put('/guru/{id}', 'Admin\GuruController@update');
-    $router->delete('/guru/{id}', 'Admin\GuruController@destroy');
-    $router->post('/guru/import', 'Admin\GuruController@import');
-    $router->get('/guru/template', 'Admin\GuruController@getTemplate');
-    $router->post('/guru/{id}/reset-password', 'Admin\GuruController@resetPassword');
-    
-    // Manajemen Siswa
-    $router->get('/siswa', 'Admin\SiswaController@index');
-    $router->post('/siswa', 'Admin\SiswaController@store');
-    $router->post('/siswa/batch', 'Admin\SiswaController@storeBatch');
-    $router->put('/siswa/{id}', 'Admin\SiswaController@update');
-    $router->delete('/siswa/{id}', 'Admin\SiswaController@destroy');
-    $router->post('/siswa/import', 'Admin\SiswaController@import');
-    $router->get('/siswa/template', 'Admin\SiswaController@getTemplate');
-    
-    // Manajemen Kelas
-    $router->get('/kelas', 'Admin\KelasController@index');
-    $router->post('/kelas', 'Admin\KelasController@store');
-    $router->put('/kelas/{id}', 'Admin\KelasController@update');
-    $router->delete('/kelas/{id}', 'Admin\KelasController@destroy');
-    $router->get('/kelas/{id}/detail', 'Admin\KelasController@detail');
-    $router->post('/kelas/{id}/assign-guru', 'Admin\KelasController@assignGuru');
-    $router->post('/kelas/{id}/assign-siswa', 'Admin\KelasController@assignSiswa');
-    
-    // Laporan
-    $router->get('/reports/nilai', 'Admin\ReportController@nilai');
-    $router->get('/reports/nilai/export', 'Admin\ReportController@exportNilai');
-    $router->get('/reports/absensi', 'Admin\ReportController@absensi');
-    $router->get('/reports/aktivitas', 'Admin\ReportController@aktivitas');
-
-    // Tambahkan route ini di dalam grup admin
-    $router->get('/storage/link', 'Admin\StorageController@createStorageLink');
-});
-
-// Guru Routes
-$router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
-    // Absensi Controller Routes
-    $router->group(['prefix' => 'absensi'], function () use ($router) {
-        // Route statis terlebih dahulu
-        $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
-        $router->get('/export', 'Guru\AbsensiController@export');
-        $router->get('/laporan', 'Guru\AbsensiController@laporan');
-        $router->post('/import', 'Guru\AbsensiController@import');
+        // Manajemen Guru
+        $router->get('/guru', 'Admin\GuruController@index');
+        $router->post('/guru', 'Admin\GuruController@store');
+        $router->post('/guru/batch', 'Admin\GuruController@storeBatch');
+        $router->put('/guru/{id}', 'Admin\GuruController@update');
+        $router->delete('/guru/{id}', 'Admin\GuruController@destroy');
+        $router->post('/guru/import', 'Admin\GuruController@import');
+        $router->get('/guru/template', 'Admin\GuruController@getTemplate');
+        $router->post('/guru/{id}/reset-password', 'Admin\GuruController@resetPassword');
         
-        // Route variabel setelahnya
-        $router->get('/{id}', 'Guru\AbsensiController@show');
-        $router->put('/{id}', 'Guru\AbsensiController@update');
-        $router->delete('/{id}', 'Guru\AbsensiController@destroy');
+        // Manajemen Siswa
+        $router->get('/siswa', 'Admin\SiswaController@index');
+        $router->post('/siswa', 'Admin\SiswaController@store');
+        $router->post('/siswa/batch', 'Admin\SiswaController@storeBatch');
+        $router->put('/siswa/{id}', 'Admin\SiswaController@update');
+        $router->delete('/siswa/{id}', 'Admin\SiswaController@destroy');
+        $router->post('/siswa/import', 'Admin\SiswaController@import');
+        $router->get('/siswa/template', 'Admin\SiswaController@getTemplate');
+        
+        // Manajemen Kelas
+        $router->get('/kelas', 'Admin\KelasController@index');
+        $router->post('/kelas', 'Admin\KelasController@store');
+        $router->put('/kelas/{id}', 'Admin\KelasController@update');
+        $router->delete('/kelas/{id}', 'Admin\KelasController@destroy');
+        $router->get('/kelas/{id}/detail', 'Admin\KelasController@detail');
+        $router->post('/kelas/{id}/assign-guru', 'Admin\KelasController@assignGuru');
+        $router->post('/kelas/{id}/assign-siswa', 'Admin\KelasController@assignSiswa');
+        
+        // Laporan
+        $router->get('/reports/nilai', 'Admin\ReportController@nilai');
+        $router->get('/reports/nilai/export', 'Admin\ReportController@exportNilai');
+        $router->get('/reports/absensi', 'Admin\ReportController@absensi');
+        $router->get('/reports/aktivitas', 'Admin\ReportController@aktivitas');
+
+        // Tambahkan route ini di dalam grup admin
+        $router->get('/storage/link', 'Admin\StorageController@createStorageLink');
     });
-    
-    // Dashboard
-    $router->get('/dashboard', 'Guru\DashboardController@index');
-    
-    // Nilai Routes
-    $router->group(['prefix' => 'nilai'], function () use ($router) {
-        $router->get('/', 'Guru\NilaiController@index');
-        $router->post('/', 'Guru\NilaiController@store');
-        $router->put('/{id}', 'Guru\NilaiController@update');
+
+    // Guru Routes
+    $router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
+        // Absensi Controller Routes
+        $router->group(['prefix' => 'absensi'], function () use ($router) {
+            // Route statis terlebih dahulu
+            $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
+            $router->get('/export', 'Guru\AbsensiController@export');
+            $router->get('/laporan', 'Guru\AbsensiController@laporan');
+            $router->post('/import', 'Guru\AbsensiController@import');
+            
+            // Route variabel setelahnya
+            $router->get('/{id}', 'Guru\AbsensiController@show');
+            $router->put('/{id}', 'Guru\AbsensiController@update');
+            $router->delete('/{id}', 'Guru\AbsensiController@destroy');
+        });
+        
+        // Dashboard
+        $router->get('/dashboard', 'Guru\DashboardController@index');
+        
+        // Nilai Routes
+        $router->group(['prefix' => 'nilai'], function () use ($router) {
+            $router->get('/', 'Guru\NilaiController@index');
+            $router->post('/', 'Guru\NilaiController@store');
+            $router->put('/{id}', 'Guru\NilaiController@update');
+        });
+        
+        // Absensi Routes  
+        $router->group(['prefix' => 'absensi'], function () use ($router) {
+            $router->get('/', 'Guru\AbsensiController@index');
+            $router->post('/', 'Guru\AbsensiController@store');
+            $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
+        });
+        
+        // Rekap Routes
+        $router->group(['prefix' => 'rekap'], function () use ($router) {
+            $router->get('/nilai', 'Guru\RekapController@nilai');
+            $router->get('/absensi', 'Guru\RekapController@absensi');
+        });
     });
-    
-    // Absensi Routes  
-    $router->group(['prefix' => 'absensi'], function () use ($router) {
-        $router->get('/', 'Guru\AbsensiController@index');
-        $router->post('/', 'Guru\AbsensiController@store');
-        $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
+
+    // User Routes
+    $router->group(['prefix' => 'user', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'UserController@index');
+        $router->post('/', 'UserController@store');
+        
+        // Pindahkan static routes ke atas sebelum dynamic routes
+        $router->get('/profile', 'UserController@getUserProfile');
+        $router->post('/change-password', 'UserController@changePassword');
+        $router->get('/pagination', 'UserController@pagenationUser');
+        
+        // Dynamic routes harus di bawah static routes
+        $router->get('/{id}', 'UserController@show');
+        $router->put('/{id}', 'UserController@update');
+        $router->delete('/{id}', 'UserController@destroy');
     });
-    
-    // Rekap Routes
-    $router->group(['prefix' => 'rekap'], function () use ($router) {
-        $router->get('/nilai', 'Guru\RekapController@nilai');
-        $router->get('/absensi', 'Guru\RekapController@absensi');
+
+    // User Activity Routes
+    $router->group(['prefix' => 'activity', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'UserActivityController@getAllActivities');
+        $router->get('/sessions', 'UserActivityController@getAllSessions');
+        $router->get('/logs', 'UserActivityController@getActivityLogs');
+        $router->get('/dates', 'UserActivityController@getActivityLogDates');
+        $router->get('/statistics', 'UserActivityController@getActivityStatistics');
+        $router->get('/usage-time', 'UserActivityController@getUsageTime');
+    });
+
+    // Sekolah Routes
+    $router->group(['prefix' => 'sekolah', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'SekolahController@index');
+        $router->post('/', 'SekolahController@store');
+        $router->get('/{id}', 'SekolahController@show');
+        $router->put('/{id}', 'SekolahController@update');
+        $router->delete('/{id}', 'SekolahController@destroy');
+        $router->get('/statistics/summary', 'SekolahController@getStatistics');
+        $router->get('/{id}/guru', 'SekolahController@getGuru');
+        $router->get('/{id}/siswa', 'SekolahController@getSiswa');
+        $router->get('/{id}/kelas', 'SekolahController@getKelas');
+    });
+
+    // Tahun Ajaran Routes
+    $router->group(['prefix' => 'tahun-ajaran', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'TahunAjaranController@index');
+        $router->post('/', 'TahunAjaranController@store');
+        $router->get('/{id}', 'TahunAjaranController@show');
+        $router->put('/{id}', 'TahunAjaranController@update');
+        $router->delete('/{id}', 'TahunAjaranController@destroy');
+        $router->put('/{id}/activate', 'TahunAjaranController@activate');
+    });
+
+    // Kelas Routes
+    $router->group(['prefix' => 'kelas', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'KelasController@index');
+        $router->post('/', 'KelasController@store');
+        $router->get('/{id}', 'KelasController@show');
+        $router->put('/{id}', 'KelasController@update');
+        $router->delete('/{id}', 'KelasController@destroy');
+        $router->get('/{id}/siswa', 'KelasController@getSiswa');
+        $router->get('/{id}/jadwal', 'KelasController@getJadwal');
+        $router->get('/{id}/nilai', 'KelasController@getNilai');
+        $router->get('/{id}/absensi', 'KelasController@getAbsensi');
+        $router->get('/{id}/guru', 'KelasController@getGuru');
+    });
+
+    // Siswa Routes
+    $router->group(['prefix' => 'siswa', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'SiswaController@index');
+        $router->post('/', 'SiswaController@store');
+        $router->get('/{id}', 'SiswaController@show');
+        $router->put('/{id}', 'SiswaController@update');
+        $router->delete('/{id}', 'SiswaController@destroy');
+        $router->post('/import', 'SiswaController@import');
+        $router->get('/{id}/nilai', 'SiswaController@getNilai');
+        $router->get('/{id}/absensi', 'SiswaController@getAbsensi');
+    });
+
+    // Mata Pelajaran Routes
+    $router->group(['prefix' => 'mapel', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'MataPelajaranController@index');
+        $router->post('/', 'MataPelajaranController@store');
+        $router->get('/{id}', 'MataPelajaranController@show');
+        $router->put('/{id}', 'MataPelajaranController@update');
+        $router->delete('/{id}', 'MataPelajaranController@destroy');
+        $router->get('/{id}/cp', 'MataPelajaranController@getCapaianPembelajaran');
+    });
+
+    // Capaian Pembelajaran Routes
+    $router->group(['prefix' => 'cp', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'CapaianPembelajaranController@index');
+        $router->post('/', 'CapaianPembelajaranController@store');
+        $router->get('/{id}', 'CapaianPembelajaranController@show');
+        $router->put('/{id}', 'CapaianPembelajaranController@update');
+        $router->delete('/{id}', 'CapaianPembelajaranController@destroy');
+        $router->get('/{id}/tp', 'CapaianPembelajaranController@getTujuanPembelajaran');
+    });
+
+    // Tujuan Pembelajaran Routes
+    $router->group(['prefix' => 'tp', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'TujuanPembelajaranController@index');
+        $router->post('/', 'TujuanPembelajaranController@store');
+        $router->get('/{id}', 'TujuanPembelajaranController@show');
+        $router->put('/{id}', 'TujuanPembelajaranController@update');
+        $router->delete('/{id}', 'TujuanPembelajaranController@destroy');
+    });
+
+    // Nilai Siswa Routes
+    $router->group(['prefix' => 'nilai', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'NilaiSiswaController@index');
+        $router->post('/', 'NilaiSiswaController@store');
+        $router->get('/{id}', 'NilaiSiswaController@show');
+        $router->put('/{id}', 'NilaiSiswaController@update');
+        $router->delete('/{id}', 'NilaiSiswaController@destroy');
+        $router->post('/import', 'NilaiSiswaController@import');
+        $router->get('/report/siswa/{siswaId}', 'NilaiSiswaController@reportBySiswa');
+        $router->get('/report/kelas/{kelasId}', 'NilaiSiswaController@reportByKelas');
+    });
+
+    // Pertemuan Bulanan Routes
+    $router->group(['prefix' => 'pertemuan', 'middleware' => 'login'], function () use ($router) {
+        $router->get('/', 'PertemuanBulananController@index');
+        $router->post('/', 'PertemuanBulananController@store');
+        $router->get('/{id}', 'PertemuanBulananController@show');
+        $router->put('/{id}', 'PertemuanBulananController@update');
+        $router->delete('/{id}', 'PertemuanBulananController@destroy');
+        
+        // New routes
+        $router->get('/kelas/{kelasId}', 'PertemuanBulananController@getByKelas');
+        $router->get('/bulan/{bulan}', 'PertemuanBulananController@getByBulan');
+        $router->get('/tahun/{tahun}', 'PertemuanBulananController@getByTahun');
+    });
+
+    // Absensi Siswa Routes
+    $router->group(['prefix' => 'absensi', 'middleware' => 'login'], function () use ($router) {
+        // Pindahkan rute statis ke atas
+        $router->get('/rekap', 'AbsensiSiswaController@getRekapAbsensi');
+        $router->get('/report/siswa/{siswaId}', 'AbsensiSiswaController@reportBySiswa');
+        $router->get('/report/kelas/{kelasId}', 'AbsensiSiswaController@reportByKelas');
+        
+        // Kemudian rute CRUD dasar
+        $router->get('/', 'AbsensiSiswaController@index');
+        $router->post('/', 'AbsensiSiswaController@store');
+        $router->post('/import', 'AbsensiSiswaController@import');
+        
+        // Rute dengan parameter di akhir
+        $router->get('/{id}', 'AbsensiSiswaController@show');
+        $router->put('/{id}', 'AbsensiSiswaController@update');
+        $router->delete('/{id}', 'AbsensiSiswaController@destroy');
     });
 });
 
-// User Routes
-$router->group(['prefix' => 'user', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'UserController@index');
-    $router->post('/', 'UserController@store');
-    
-    // Pindahkan static routes ke atas sebelum dynamic routes
-    $router->get('/profile', 'UserController@getUserProfile');
-    $router->post('/change-password', 'UserController@changePassword');
-    $router->get('/pagination', 'UserController@pagenationUser');
-    
-    // Dynamic routes harus di bawah static routes
-    $router->get('/{id}', 'UserController@show');
-    $router->put('/{id}', 'UserController@update');
-    $router->delete('/{id}', 'UserController@destroy');
-});
-
-// User Activity Routes
-$router->group(['prefix' => 'activity', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'UserActivityController@getAllActivities');
-    $router->get('/sessions', 'UserActivityController@getAllSessions');
-    $router->get('/logs', 'UserActivityController@getActivityLogs');
-    $router->get('/dates', 'UserActivityController@getActivityLogDates');
-    $router->get('/statistics', 'UserActivityController@getActivityStatistics');
-    $router->get('/usage-time', 'UserActivityController@getUsageTime');
-});
-
-// Sekolah Routes
-$router->group(['prefix' => 'sekolah', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'SekolahController@index');
-    $router->post('/', 'SekolahController@store');
-    $router->get('/{id}', 'SekolahController@show');
-    $router->put('/{id}', 'SekolahController@update');
-    $router->delete('/{id}', 'SekolahController@destroy');
-    $router->get('/statistics/summary', 'SekolahController@getStatistics');
-    $router->get('/{id}/guru', 'SekolahController@getGuru');
-    $router->get('/{id}/siswa', 'SekolahController@getSiswa');
-    $router->get('/{id}/kelas', 'SekolahController@getKelas');
-});
-
-// Tahun Ajaran Routes
-$router->group(['prefix' => 'tahun-ajaran', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'TahunAjaranController@index');
-    $router->post('/', 'TahunAjaranController@store');
-    $router->get('/{id}', 'TahunAjaranController@show');
-    $router->put('/{id}', 'TahunAjaranController@update');
-    $router->delete('/{id}', 'TahunAjaranController@destroy');
-    $router->put('/{id}/activate', 'TahunAjaranController@activate');
-});
-
-// Kelas Routes
-$router->group(['prefix' => 'kelas', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'KelasController@index');
-    $router->post('/', 'KelasController@store');
-    $router->get('/{id}', 'KelasController@show');
-    $router->put('/{id}', 'KelasController@update');
-    $router->delete('/{id}', 'KelasController@destroy');
-    $router->get('/{id}/siswa', 'KelasController@getSiswa');
-    $router->get('/{id}/jadwal', 'KelasController@getJadwal');
-    $router->get('/{id}/nilai', 'KelasController@getNilai');
-    $router->get('/{id}/absensi', 'KelasController@getAbsensi');
-    $router->get('/{id}/guru', 'KelasController@getGuru');
-});
-
-// Siswa Routes
-$router->group(['prefix' => 'siswa', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'SiswaController@index');
-    $router->post('/', 'SiswaController@store');
-    $router->get('/{id}', 'SiswaController@show');
-    $router->put('/{id}', 'SiswaController@update');
-    $router->delete('/{id}', 'SiswaController@destroy');
-    $router->post('/import', 'SiswaController@import');
-    $router->get('/{id}/nilai', 'SiswaController@getNilai');
-    $router->get('/{id}/absensi', 'SiswaController@getAbsensi');
-});
-
-// Mata Pelajaran Routes
-$router->group(['prefix' => 'mapel', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'MataPelajaranController@index');
-    $router->post('/', 'MataPelajaranController@store');
-    $router->get('/{id}', 'MataPelajaranController@show');
-    $router->put('/{id}', 'MataPelajaranController@update');
-    $router->delete('/{id}', 'MataPelajaranController@destroy');
-    $router->get('/{id}/cp', 'MataPelajaranController@getCapaianPembelajaran');
-});
-
-// Capaian Pembelajaran Routes
-$router->group(['prefix' => 'cp', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'CapaianPembelajaranController@index');
-    $router->post('/', 'CapaianPembelajaranController@store');
-    $router->get('/{id}', 'CapaianPembelajaranController@show');
-    $router->put('/{id}', 'CapaianPembelajaranController@update');
-    $router->delete('/{id}', 'CapaianPembelajaranController@destroy');
-    $router->get('/{id}/tp', 'CapaianPembelajaranController@getTujuanPembelajaran');
-});
-
-// Tujuan Pembelajaran Routes
-$router->group(['prefix' => 'tp', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'TujuanPembelajaranController@index');
-    $router->post('/', 'TujuanPembelajaranController@store');
-    $router->get('/{id}', 'TujuanPembelajaranController@show');
-    $router->put('/{id}', 'TujuanPembelajaranController@update');
-    $router->delete('/{id}', 'TujuanPembelajaranController@destroy');
-});
-
-// Nilai Siswa Routes
-$router->group(['prefix' => 'nilai', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'NilaiSiswaController@index');
-    $router->post('/', 'NilaiSiswaController@store');
-    $router->get('/{id}', 'NilaiSiswaController@show');
-    $router->put('/{id}', 'NilaiSiswaController@update');
-    $router->delete('/{id}', 'NilaiSiswaController@destroy');
-    $router->post('/import', 'NilaiSiswaController@import');
-    $router->get('/report/siswa/{siswaId}', 'NilaiSiswaController@reportBySiswa');
-    $router->get('/report/kelas/{kelasId}', 'NilaiSiswaController@reportByKelas');
-});
-
-// Pertemuan Bulanan Routes
-$router->group(['prefix' => 'pertemuan', 'middleware' => 'login'], function () use ($router) {
-    $router->get('/', 'PertemuanBulananController@index');
-    $router->post('/', 'PertemuanBulananController@store');
-    $router->get('/{id}', 'PertemuanBulananController@show');
-    $router->put('/{id}', 'PertemuanBulananController@update');
-    $router->delete('/{id}', 'PertemuanBulananController@destroy');
-    
-    // New routes
-    $router->get('/kelas/{kelasId}', 'PertemuanBulananController@getByKelas');
-    $router->get('/bulan/{bulan}', 'PertemuanBulananController@getByBulan');
-    $router->get('/tahun/{tahun}', 'PertemuanBulananController@getByTahun');
-});
-
-// Absensi Siswa Routes
-$router->group(['prefix' => 'absensi', 'middleware' => 'login'], function () use ($router) {
-    // Pindahkan rute statis ke atas
-    $router->get('/rekap', 'AbsensiSiswaController@getRekapAbsensi');
-    $router->get('/report/siswa/{siswaId}', 'AbsensiSiswaController@reportBySiswa');
-    $router->get('/report/kelas/{kelasId}', 'AbsensiSiswaController@reportByKelas');
-    
-    // Kemudian rute CRUD dasar
-    $router->get('/', 'AbsensiSiswaController@index');
-    $router->post('/', 'AbsensiSiswaController@store');
-    $router->post('/import', 'AbsensiSiswaController@import');
-    
-    // Rute dengan parameter di akhir
-    $router->get('/{id}', 'AbsensiSiswaController@show');
-    $router->put('/{id}', 'AbsensiSiswaController@update');
-    $router->delete('/{id}', 'AbsensiSiswaController@destroy');
-});
+// Tambahkan route untuk heartbeat
+$router->post('/activity/heartbeat', 'ActivityController@heartbeat');
 
 // API Mobile - Guru Routes
 // $router->group(['prefix' => 'api/guru', 'middleware' => 'login'], function () use ($router) {
