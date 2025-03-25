@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Ramsey\Uuid\Uuid;
 
 class TahunAjaranController extends BaseAdminController
 {
@@ -17,7 +18,20 @@ class TahunAjaranController extends BaseAdminController
                 ->orderBy('tanggal_mulai', 'desc')
                 ->get();
             
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data tahun ajaran", $tahunAjaran);
+            // Konversi ID ke UUID dan simpan perubahan
+            $tahunAjaran->transform(function ($item) {
+                if (is_numeric($item->id)) {
+                    $oldId = $item->id;
+                    $item->id = Uuid::uuid4()->toString();
+                    $item->save();
+                    \Log::info("ID tahun ajaran dikonversi: {$oldId} -> {$item->id}");
+                }
+                return $item;
+            });
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data tahun ajaran", [
+                'tahun_ajaran' => $tahunAjaran
+            ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
