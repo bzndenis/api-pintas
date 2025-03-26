@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\Siswa;
+use App\Models\Kelas;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
 
 class SiswaController extends BaseAdminController
 {
@@ -87,69 +90,101 @@ class SiswaController extends BaseAdminController
     {
         $this->validate($request, [
             'file' => 'required|file|mimes:xlsx,xls|max:2048',
-            'kelas_id' => 'required|exists:kelas,id'
         ]);
 
         try {
             DB::beginTransaction();
             
+            $admin = Auth::user();
             $file = $request->file('file');
-            $kelas_id = $request->kelas_id;
-            $sekolah_id = Auth::user()->sekolah_id;
             
-            // Baca file Excel
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getPathname());
+            // Load spreadsheet
+            $spreadsheet = IOFactory::load($file->getPathname());
             $worksheet = $spreadsheet->getActiveSheet();
             $rows = $worksheet->toArray();
             
-            // Hapus baris header dan contoh
-            array_shift($rows); // Hapus header
-            array_shift($rows); // Hapus contoh
-            array_shift($rows); // Hapus catatan
+            // Hapus header (baris pertama)
+            array_shift($rows);
             
-            $response = [
-                'total_data' => count($rows),
-                'berhasil' => 0,
-                'gagal' => 0,
-                'errors' => []
-            ];
+            $imported = 0;
+            $errors = [];
+            $importedData = [];
             
             foreach ($rows as $index => $row) {
-                try {
-                    // Skip baris kosong
-                    if (empty($row[0])) continue;
-                    
-                    // Validasi data minimal
-                    if (empty($row[0]) || empty($row[1]) || empty($row[2])) {
-                        throw new \Exception("Nama, NISN, dan Jenis Kelamin wajib diisi");
-                    }
-                    
-                    // Validasi jenis kelamin
-                    if (!in_array(strtoupper($row[2]), ['L', 'P'])) {
-                        throw new \Exception("Jenis kelamin harus L atau P");
-                    }
-                    
-                    // Buat data siswa
-                    $siswa = Siswa::create([
-                        'nama' => $row[0],
-                        'nisn' => $row[1],
-                        'jenis_kelamin' => strtoupper($row[2]),
-                        'kelas_id' => $kelas_id,
-                        'sekolah_id' => $sekolah_id
-                    ]);
-                    
-                    $response['berhasil']++;
-                } catch (\Exception $e) {
-                    $response['gagal']++;
-                    $response['errors'][] = "Baris " . ($index + 4) . ": " . $e->getMessage();
+                // Skip baris kosong
+                if (empty($row[0]) && empty($row[1]) && empty($row[2])) {
+                    continue;
                 }
+                
+                $rowNumber = $index + 2; // +2 karena index dimulai dari 0 dan header di baris 1
+                
+                // Validasi data
+                $nisn = trim($row[0] ?? '');
+                $nama = trim($row[1] ?? '');
+                $jenisKelamin = trim($row[2] ?? '');
+                $kelasId = trim($row[3] ?? '');
+                
+                // Validasi NISN
+                if (empty($nisn)) {
+                    $errors[] = "Baris $rowNumber: NISN tidak boleh kosong";
+                    continue;
+                }
+                
+                // Cek apakah NISN sudah terdaftar
+                if (Siswa::where('nisn', $nisn)->exists()) {
+                    $errors[] = "Baris $rowNumber: NISN $nisn sudah terdaftar";
+                    continue;
+                }
+                
+                // Validasi jenis kelamin
+                if (empty($jenisKelamin) || !in_array($jenisKelamin, ['L', 'P'])) {
+                    $errors[] = "Baris $rowNumber: Jenis kelamin harus L atau P";
+                    continue;
+                }
+                
+                // Validasi kelas
+                if (empty($kelasId)) {
+                    $errors[] = "Baris $rowNumber: ID Kelas tidak boleh kosong";
+                    continue;
+                }
+                
+                // Cek apakah kelas ada
+                $kelas = Kelas::where('id', $kelasId)->where('sekolah_id', $admin->sekolah_id)->first();
+                if (!$kelas) {
+                    $errors[] = "Baris $rowNumber: Kelas dengan ID $kelasId tidak ditemukan";
+                    continue;
+                }
+                
+                // Buat data siswa
+                $siswa = Siswa::create([
+                    'nisn' => $nisn,
+                    'nama' => $nama,
+                    'jenis_kelamin' => $jenisKelamin,
+                    'kelas_id' => $kelasId,
+                    'sekolah_id' => $admin->sekolah_id
+                ]);
+                
+                $importedData[] = [
+                    'id' => $siswa->id,
+                    'nisn' => $nisn,
+                    'nama' => $nama,
+                    'jenis_kelamin' => $jenisKelamin,
+                    'kelas_id' => $kelasId
+                ];
+                
+                $imported++;
             }
             
             DB::commit();
-            return ResponseBuilder::success(200, "Berhasil mengimport data", $response);
+            
+            return ResponseBuilder::success(200, "Berhasil mengimpor $imported data siswa", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return ResponseBuilder::error(500, "Gagal mengimport data: " . $e->getMessage());
+            return ResponseBuilder::error(500, "Gagal mengimpor data: " . $e->getMessage());
         }
     }
 
@@ -265,10 +300,10 @@ class SiswaController extends BaseAdminController
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header dengan penjelasan yang jelas
-            $sheet->setCellValue('A1', 'Nama');
-            $sheet->setCellValue('B1', 'NISN');
-            $sheet->setCellValue('C1', 'Jenis Kelamin (L/P)');
-            $sheet->setCellValue('D1', 'ID Kelas');
+            $sheet->setCellValue('A1', 'nama');
+            $sheet->setCellValue('B1', 'nisn');
+            $sheet->setCellValue('C1', 'jenis_kelamin');
+            $sheet->setCellValue('D1', 'kelas_id');
             
             // Contoh data
             $sheet->setCellValue('A2', 'Contoh: Budi Santoso');
