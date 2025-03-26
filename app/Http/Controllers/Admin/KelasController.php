@@ -39,14 +39,26 @@ class KelasController extends BaseAdminController
         $this->validate($request, [
             'nama_kelas' => 'required|string|max:255',
             'tingkat' => 'required|string|max:255',
-            'tahun_ajaran_id' => 'required|exists:tahun_ajaran,id',
+            'tahun' => 'required',
             'guru_id' => 'required|exists:guru,id'
         ]);
 
         try {
+            $admin = Auth::user();
             $data = $request->all();
-            $data['sekolah_id'] = Auth::user()->sekolah_id;
-
+            $data['sekolah_id'] = $admin->sekolah_id;
+            
+            // Cek apakah kombinasi nama_kelas, tahun, dan sekolah_id sudah ada
+            $existingKelas = Kelas::where('nama_kelas', $data['nama_kelas'])
+                ->where('tahun', $data['tahun'])
+                ->where('tingkat', $data['tingkat'])
+                ->where('sekolah_id', $admin->sekolah_id)
+                ->first();
+                
+            if ($existingKelas) {
+                return ResponseBuilder::error(400, "Kelas dengan nama, tingkat, dan tahun yang sama sudah ada");
+            }
+            
             $kelas = Kelas::create($data);
 
             return ResponseBuilder::success(201, "Berhasil menambahkan kelas", $kelas);
@@ -60,18 +72,33 @@ class KelasController extends BaseAdminController
         $this->validate($request, [
             'nama_kelas' => 'required|string|max:255',
             'tingkat' => 'required|string|max:255',
-            'tahun_ajaran_id' => 'required|exists:tahun_ajaran,id',
+            'tahun' => 'required',
             'guru_id' => 'required|exists:guru,id'
         ]);
 
         try {
-            $kelas = Kelas::where('sekolah_id', Auth::user()->sekolah_id)->find($id);
+            $admin = Auth::user();
+            $kelas = Kelas::where('sekolah_id', $admin->sekolah_id)->find($id);
             
             if (!$kelas) {
                 return ResponseBuilder::error(404, "Kelas tidak ditemukan");
             }
             
-            $kelas->update($request->all());
+            $data = $request->all();
+            
+            // Cek apakah kombinasi nama_kelas, tahun, dan sekolah_id sudah ada (selain kelas ini sendiri)
+            $existingKelas = Kelas::where('nama_kelas', $data['nama_kelas'])
+                ->where('tahun', $data['tahun'])
+                ->where('tingkat', $data['tingkat'])
+                ->where('sekolah_id', $admin->sekolah_id)
+                ->where('id', '!=', $id)
+                ->first();
+                
+            if ($existingKelas) {
+                return ResponseBuilder::error(400, "Kelas dengan nama, tingkat, dan tahun yang sama sudah ada");
+            }
+            
+            $kelas->update($data);
             
             return ResponseBuilder::success(200, "Berhasil mengupdate kelas", $kelas);
         } catch (\Exception $e) {
@@ -150,8 +177,7 @@ class KelasController extends BaseAdminController
     public function assignSiswa(Request $request, $id)
     {
         $this->validate($request, [
-            'siswa_ids' => 'required|array',
-            'siswa_ids.*' => 'exists:siswa,id'
+            'siswa_id' => 'required|exists:siswa,id'
         ]);
 
         try {
@@ -164,7 +190,7 @@ class KelasController extends BaseAdminController
             }
             
             // Update kelas_id untuk semua siswa yang dipilih
-            Siswa::whereIn('id', $request->siswa_ids)
+            Siswa::where('id', $request->siswa_id)
                 ->where('sekolah_id', Auth::user()->sekolah_id)
                 ->update(['kelas_id' => $kelas->id]);
             
@@ -172,7 +198,7 @@ class KelasController extends BaseAdminController
             
             return ResponseBuilder::success(200, "Berhasil menetapkan siswa ke kelas", [
                 'kelas' => $kelas,
-                'siswa_count' => count($request->siswa_ids)
+                'siswa_count' => 1
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
