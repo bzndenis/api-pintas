@@ -17,28 +17,20 @@ class Siswa extends Model
     
     protected $fillable = [
         'id',
-        'nis',
         'nisn',
         'nama',
         'jenis_kelamin',
-        'tempat_lahir',
-        'tanggal_lahir',
-        'alamat',
-        'nama_ortu',
-        'no_telp_ortu',
         'kelas_id',
         'sekolah_id',
     ];
     
     protected $casts = [
-        'tanggal_lahir' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
     
     protected $dates = [
-        'tanggal_lahir',
         'created_at',
         'updated_at',
         'deleted_at',
