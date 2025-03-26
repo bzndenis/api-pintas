@@ -16,7 +16,28 @@ class DashboardController extends Controller
     public function index()
     {
         try {
-            $sekolahId = Auth::user()->sekolah_id;
+            $user = Auth::user();
+            $sekolahId = $user->sekolah_id;
+            $username = $user->username;
+            // Mendapatkan informasi user
+            // Mendapatkan informasi lengkap user
+            $fullname = $user->fullname;
+            $role = $user->role;
+            $lastLogin = $user->last_login ? Carbon::parse($user->last_login)->format('d-m-Y H:i:s') : 'Belum pernah login';
+            
+            // Mendapatkan statistik aktivitas user
+            $userActivities = UserActivity::where('user_id', $user->id)
+                ->where('created_at', '>=', Carbon::now()->subDays(30))
+                ->count();
+                
+            $userSessions = \DB::table('user_sessions')
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->count();
+            
+            // Mendapatkan informasi sekolah
+            $sekolah = $user->sekolah;
+            $namaSekolah = $user->sekolah->nama_sekolah ?? 'Tidak ada sekolah';
             
             // Statistik dasar
             $totalGuru = Guru::where('sekolah_id', $sekolahId)->count();
@@ -31,6 +52,11 @@ class DashboardController extends Controller
                 ->get();
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data dashboard", [
+                'user_info' => [
+                    'username' => $username,
+                    'fullname' => $fullname,
+                    'nama_sekolah' => $namaSekolah
+                ],
                 'statistics' => [
                     'total_guru' => $totalGuru,
                     'total_siswa' => $totalSiswa,

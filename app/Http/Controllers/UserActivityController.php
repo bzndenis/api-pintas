@@ -405,4 +405,99 @@ class UserActivityController extends Controller
             return ResponseBuilder::error(500, "Gagal mendapatkan data waktu penggunaan: " . $e->getMessage());
         }
     }
+
+    /**
+     * Mendapatkan waktu penggunaan untuk semua pengguna
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function getAllUsageTime(Request $request)
+    {
+        try {
+            $sekolahId = $request->sekolah_id;
+            
+            // Parameter filter
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
+            
+            // Mendapatkan parameter paginasi
+            $limit = $request->input('limit', 10);
+            $page = $request->input('page', 1);
+            $offset = ($page - 1) * $limit;
+            
+            // Query dasar untuk mendapatkan semua user di sekolah ini
+            $query = DB::table('users as u')
+                ->select(
+                    'u.id',
+                    'u.fullname as nama_lengkap',
+                    'u.email',
+                    'u.role',
+                    DB::raw('SUM(IFNULL(us.duration, 0)) as total_duration')
+                )
+                ->leftJoin('user_sessions as us', function($join) use ($startDate, $endDate) {
+                    $join->on('u.id', '=', 'us.user_id')
+                        ->where('us.status', '=', 'expired');
+                    
+                    if ($startDate && $endDate) {
+                        $join->whereBetween('us.login_time', [
+                            $startDate . ' 00:00:00',
+                            $endDate . ' 23:59:59'
+                        ]);
+                    }
+                })
+                ->where('u.sekolah_id', $sekolahId)
+                ->where('u.is_active', true)
+                ->groupBy('u.id', 'u.fullname', 'u.email', 'u.role');
+            
+            // Filter berdasarkan role jika ada
+            if ($request->input('role')) {
+                $query->where('u.role', $request->input('role'));
+            }
+            
+            // Hitung total records untuk paginasi
+            $countQuery = clone $query;
+            $total = $countQuery->count();
+            
+            // Ambil data dengan paginasi
+            $users = $query->orderBy('total_duration', 'desc')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+            
+            // Format data untuk respons
+            $formattedUsers = $users->map(function($user) {
+                $totalSeconds = $user->total_duration;
+                $hours = floor($totalSeconds / 3600);
+                $minutes = floor(($totalSeconds % 3600) / 60);
+                $seconds = $totalSeconds % 60;
+                
+                return [
+                    'id' => $user->id,
+                    'nama_lengkap' => $user->nama_lengkap,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'total_duration_seconds' => $totalSeconds,
+                    'formatted_duration' => sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds)
+                ];
+            });
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data waktu penggunaan", [
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'data' => $formattedUsers,
+                'filter' => [
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'role' => $request->input('role')
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Gagal mengambil data waktu penggunaan: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
+        }
+    }
 } 

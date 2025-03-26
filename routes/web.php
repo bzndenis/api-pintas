@@ -1041,41 +1041,33 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 
     // Guru Routes
     $router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
-        // Absensi Controller Routes
-        $router->group(['prefix' => 'absensi'], function () use ($router) {
-            // Route statis terlebih dahulu
-            $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
-            $router->get('/export', 'Guru\AbsensiController@export');
-            $router->get('/laporan', 'Guru\AbsensiController@laporan');
-            $router->post('/import', 'Guru\AbsensiController@import');
-            
-            // Route variabel setelahnya
-            $router->get('/{id}', 'Guru\AbsensiController@show');
-            $router->put('/{id}', 'Guru\AbsensiController@update');
-            $router->delete('/{id}', 'Guru\AbsensiController@destroy');
-        });
-        
         // Dashboard
         $router->get('/dashboard', 'Guru\DashboardController@index');
         
-        // Nilai Routes
+        // Data Peserta Kelas
+        $router->get('/kelas', 'Guru\KelasController@index');
+        $router->get('/kelas/{id}', 'Guru\KelasController@show');
+        $router->get('/kelas/{id}/siswa', 'Guru\KelasController@listSiswa');
+        
+        // Penilaian Siswa
         $router->group(['prefix' => 'nilai'], function () use ($router) {
             $router->get('/', 'Guru\NilaiController@index');
             $router->post('/', 'Guru\NilaiController@store');
+            $router->get('/{id}', 'Guru\NilaiController@show');
             $router->put('/{id}', 'Guru\NilaiController@update');
+            $router->get('/rekap', 'Guru\RekapController@nilai');
+            $router->get('/export', 'Guru\NilaiController@export');
         });
         
-        // Absensi Routes  
+        // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
             $router->get('/', 'Guru\AbsensiController@index');
             $router->post('/', 'Guru\AbsensiController@store');
+            $router->get('/{id}', 'Guru\AbsensiController@show');
+            $router->put('/{id}', 'Guru\AbsensiController@update');
             $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
-        });
-        
-        // Rekap Routes
-        $router->group(['prefix' => 'rekap'], function () use ($router) {
-            $router->get('/nilai', 'Guru\RekapController@nilai');
-            $router->get('/absensi', 'Guru\RekapController@absensi');
+            $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
+            $router->get('/export', 'Guru\AbsensiController@export');
         });
     });
 
@@ -1087,6 +1079,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/dates', 'UserActivityController@getActivityLogDates');
         $router->get('/statistics', 'UserActivityController@getActivityStatistics');
         $router->get('/usage-time', 'UserActivityController@getUsageTime');
+        $router->get('/all-usage-time', 'UserActivityController@getAllUsageTime');
     });
 });
 
