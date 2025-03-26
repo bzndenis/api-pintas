@@ -16,5 +16,8 @@ class Kernel extends HttpKernel
     protected $routeMiddleware = [
         // middleware lain yang sudah ada...
         'activity.tracker' => \App\Http\Middleware\ActivityTrackerMiddleware::class,
+        'login' => \App\Http\Middleware\LoginMiddleware::class,
+        'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        'auto.logout' => \App\Http\Middleware\AutoLogoutMiddleware::class,
     ];
 } 
