@@ -987,18 +987,18 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             // Tambahkan endpoint untuk impor mapel
             $router->post('/mapel/import', 'Admin\MataPelajaranController@import');
             
-            // Capaian Pembelajaran
-            $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
-            $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
-            $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
-            $router->delete('/cp/{id}', 'Admin\CapaianPembelajaranController@destroy');
-            $router->post('/cp/batch', 'Admin\CapaianPembelajaranController@storeBatch');
+            // // Capaian Pembelajaran
+            // $router->get('/cp', 'Admin\CapaianPembelajaranController@index');
+            // $router->post('/cp', 'Admin\CapaianPembelajaranController@store');
+            // $router->put('/cp/{id}', 'Admin\CapaianPembelajaranController@update');
+            // $router->delete('/cp/{id}', 'Admin\CapaianPembelajaranController@destroy');
+            // $router->post('/cp/batch', 'Admin\CapaianPembelajaranController@storeBatch');
             
-            // Tujuan Pembelajaran
-            $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
-            $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
-            $router->put('/tp/{id}', 'Admin\TujuanPembelajaranController@update');
-            $router->delete('/tp/{id}', 'Admin\TujuanPembelajaranController@destroy');
+            // // Tujuan Pembelajaran
+            // $router->get('/tp', 'Admin\TujuanPembelajaranController@index');
+            // $router->post('/tp', 'Admin\TujuanPembelajaranController@store');
+            // $router->put('/tp/{id}', 'Admin\TujuanPembelajaranController@update');
+            // $router->delete('/tp/{id}', 'Admin\TujuanPembelajaranController@destroy');
         });
         
         // Manajemen Guru

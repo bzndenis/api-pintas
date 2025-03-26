@@ -78,6 +78,7 @@ class GuruController extends Controller
                 'is_active' => true,
                 'sekolah_id' => $admin->sekolah_id,
                 'fullname' => $request->nama,
+                'username' => $request->email,
                 'no_telp' => $request->no_telp
             ]);
 
@@ -111,10 +112,15 @@ class GuruController extends Controller
 
     public function update(Request $request, $id)
     {
+        $guru = Guru::find($id);
+        if (!$guru) {
+            return ResponseBuilder::error(404, "Data guru tidak ditemukan");
+        }
+
         $this->validate($request, [
             'nama' => 'required|string|max:255',
             'nip' => 'nullable|string|unique:guru,nip,' . $id,
-            'email' => 'required|email|unique:users,email,' . $id . ',id',
+            'email' => 'required|email|unique:users,email,' . $guru->user_id,
             'no_telp' => 'nullable|string|max:20',
             'mata_pelajaran' => 'nullable|array',
             'mata_pelajaran.*' => 'exists:mata_pelajaran,id',
@@ -144,21 +150,19 @@ class GuruController extends Controller
             $guru->user->update([
                 'email' => $request->email,
                 'fullname' => $request->nama,
+                'username' => $request->email,
                 'no_telp' => $request->no_telp,
                 'is_active' => $request->has('is_active') ? $request->is_active : $guru->user->is_active
             ]);
             
             // Update mata pelajaran jika ada
             if ($request->has('mata_pelajaran')) {
-                // Dapatkan mata pelajaran yang saat ini diajar oleh guru
-                $currentMapel = MataPelajaran::where('guru_id', $guru->id)->pluck('id')->toArray();
+                // Hapus semua relasi mata pelajaran yang ada
+                MataPelajaran::where('guru_id', $guru->id)->update(['guru_id' => null]);
                 
-                // Mata pelajaran yang akan ditambahkan (ada dalam daftar baru)
-                $mapelToAdd = array_diff($request->mata_pelajaran, $currentMapel);
-                
-                // Update guru_id untuk mata pelajaran yang baru
-                if (!empty($mapelToAdd)) {
-                    MataPelajaran::whereIn('id', $mapelToAdd)
+                // Tambahkan relasi mata pelajaran baru
+                if (is_array($request->mata_pelajaran) && count($request->mata_pelajaran) > 0) {
+                    MataPelajaran::whereIn('id', $request->mata_pelajaran)
                         ->update(['guru_id' => $guru->id]);
                 }
             }
@@ -231,7 +235,7 @@ class GuruController extends Controller
                 }
                 
                 // Generate password
-                $password = Str::random(8);
+                $password = '1234';
                 
                 // Buat user account
                 $user = User::create([
@@ -241,7 +245,8 @@ class GuruController extends Controller
                     'is_active' => true,
                     'sekolah_id' => $admin->sekolah_id,
                     'fullname' => $nama,
-                    'no_telp' => $noTelp
+                    'no_telp' => $noTelp,
+                    'username' => $email
                 ]);
                 
                 // Buat data guru
@@ -292,13 +297,13 @@ class GuruController extends Controller
             DB::beginTransaction();
             
             // Cek apakah guru masih memiliki kelas sebagai wali kelas
-            if ($guru->kelasWali()->count() > 0) {
+            if ($guru->kelas()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih menjadi wali kelas");
             }
             
             // Cek apakah guru masih mengajar mata pelajaran
-            if ($guru->jadwalMengajar()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih memiliki jadwal mengajar");
+            if ($guru->mataPelajaran()->count() > 0) {
+                return ResponseBuilder::error(400, "Tidak dapat menghapus guru yang masih mengajar mata pelajaran");
             }
             
             // Hapus user yang terkait jika ada
@@ -354,10 +359,10 @@ class GuruController extends Controller
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
-            // Set header
+            // Set header dengan penjelasan yang lebih jelas
             $sheet->setCellValue('A1', 'Nama');
             $sheet->setCellValue('B1', 'NIP');
-            $sheet->setCellValue('C1', 'Email');
+            $sheet->setCellValue('C1', 'Email (akan digunakan sebagai username)');
             $sheet->setCellValue('D1', 'No. Telepon');
             
             // Contoh data
@@ -366,20 +371,40 @@ class GuruController extends Controller
             $sheet->setCellValue('C2', 'Contoh: budi@example.com');
             $sheet->setCellValue('D2', 'Contoh: 081234567890');
             
-            // Simpan file
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            // Tambahkan catatan di baris ketiga
+            $sheet->setCellValue('A3', 'Catatan: Email wajib diisi dan akan digunakan sebagai username');
+            $sheet->mergeCells('A3:D3');
+            
+            // Atur lebar kolom agar lebih mudah dibaca
+            $sheet->getColumnDimension('A')->setWidth(25);
+            $sheet->getColumnDimension('B')->setWidth(25);
+            $sheet->getColumnDimension('C')->setWidth(40);
+            $sheet->getColumnDimension('D')->setWidth(25);
+            
+            // Atur style untuk header
+            $headerStyle = [
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E0E0E0']
+                ]
+            ];
+            $sheet->getStyle('A1:D1')->applyFromArray($headerStyle);
+            
+            // Atur style untuk catatan
+            $noteStyle = [
+                'font' => ['italic' => true, 'color' => ['rgb' => '808080']]
+            ];
+            $sheet->getStyle('A3:D3')->applyFromArray($noteStyle);
+            
             $filename = 'template_import_guru.xlsx';
-            $path = storage_path('app/public/templates/' . $filename);
             
-            // Buat direktori jika belum ada
-            if (!file_exists(storage_path('app/public/templates'))) {
-                mkdir(storage_path('app/public/templates'), 0755, true);
-            }
-            
-            $writer->save($path);
-            
-            return ResponseBuilder::success(200, "Berhasil membuat template", [
-                'file_url' => url('storage/templates/' . $filename)
+            // Kembalikan file sebagai stream
+            return response()->streamDownload(function() use ($spreadsheet) {
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal membuat template: " . $e->getMessage());
