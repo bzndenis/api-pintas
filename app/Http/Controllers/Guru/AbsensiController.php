@@ -42,7 +42,18 @@ class AbsensiController extends BaseGuruController
             
             $absensi = $query->orderBy('created_at', 'desc')->get();
             
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data absensi", $absensi);
+            // Transformasi data untuk frontend
+            $transformedAbsensi = $absensi->map(function($item) {
+                $status = 'hadir';
+                if ($item->izin == 1) $status = 'izin';
+                if ($item->sakit == 1) $status = 'sakit';
+                if ($item->absen == 1) $status = 'absen';
+                
+                $item->status = $status;
+                return $item;
+            });
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data absensi", $transformedAbsensi);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
@@ -58,7 +69,7 @@ class AbsensiController extends BaseGuruController
             'materi' => 'required|string',
             'absensi' => 'required|array',
             'absensi.*.siswa_id' => 'required|exists:siswa,id',
-            'absensi.*.status' => 'required|in:hadir,izin,sakit,alpha'
+            'absensi.*.status' => 'required|in:hadir,izin,sakit,absen'
         ]);
 
         try {
@@ -79,11 +90,37 @@ class AbsensiController extends BaseGuruController
             
             // Simpan absensi siswa
             foreach ($request->absensi as $absen) {
+                // Inisialisasi nilai default
+                $hadir = 0;
+                $izin = 0;
+                $sakit = 0;
+                $absen_val = 0;
+                
+                // Set nilai berdasarkan status
+                switch ($absen['status']) {
+                    case 'hadir':
+                        $hadir = 1;
+                        break;
+                    case 'izin':
+                        $izin = 1;
+                        break;
+                    case 'sakit':
+                        $sakit = 1;
+                        break;
+                    case 'absen':
+                        $absen_val = 1;
+                        break;
+                }
+                
                 AbsensiSiswa::create([
                     'pertemuan_id' => $pertemuan->id,
                     'siswa_id' => $absen['siswa_id'],
-                    'status' => $absen['status'],
+                    'hadir' => $hadir,
+                    'izin' => $izin,
+                    'sakit' => $sakit,
+                    'absen' => $absen_val,
                     'keterangan' => $absen['keterangan'] ?? null,
+                    'created_by' => Auth::user()->id,
                     'sekolah_id' => $guru->sekolah_id
                 ]);
             }
@@ -140,7 +177,35 @@ class AbsensiController extends BaseGuruController
                 return ResponseBuilder::error(404, "Data absensi tidak ditemukan");
             }
             
-            $absensi->update($request->only(['status', 'keterangan']));
+            // Inisialisasi nilai default
+            $hadir = 0;
+            $izin = 0;
+            $sakit = 0;
+            $absen_val = 0;
+            
+            // Set nilai berdasarkan status
+            switch ($request->status) {
+                case 'hadir':
+                    $hadir = 1;
+                    break;
+                case 'izin':
+                    $izin = 1;
+                    break;
+                case 'sakit':
+                    $sakit = 1;
+                    break;
+                case 'absen':
+                    $absen_val = 1;
+                    break;
+            }
+            
+            $absensi->update([
+                'hadir' => $hadir,
+                'izin' => $izin,
+                'sakit' => $sakit,
+                'absen' => $absen_val,
+                'keterangan' => $request->keterangan ?? null
+            ]);
             
             return ResponseBuilder::success(200, "Berhasil mengupdate absensi", ['absensi' => $absensi]);
         } catch (\Exception $e) {
@@ -253,7 +318,7 @@ class AbsensiController extends BaseGuruController
         $this->validate($request, [
             'absensi' => 'required|array',
             'absensi.*.id' => 'required|exists:absensi_siswa,id',
-            'absensi.*.status' => 'required|in:hadir,izin,sakit,alpha',
+            'absensi.*.status' => 'required|in:hadir,izin,sakit,absen',
             'absensi.*.keterangan' => 'nullable|string'
         ]);
 
@@ -269,8 +334,33 @@ class AbsensiController extends BaseGuruController
                 })->find($absen['id']);
                 
                 if ($absensi) {
+                    // Inisialisasi nilai default
+                    $hadir = 0;
+                    $izin = 0;
+                    $sakit = 0;
+                    $absen_val = 0;
+                    
+                    // Set nilai berdasarkan status
+                    switch ($absen['status']) {
+                        case 'hadir':
+                            $hadir = 1;
+                            break;
+                        case 'izin':
+                            $izin = 1;
+                            break;
+                        case 'sakit':
+                            $sakit = 1;
+                            break;
+                        case 'absen':
+                            $absen_val = 1;
+                            break;
+                    }
+                    
                     $absensi->update([
-                        'status' => $absen['status'],
+                        'hadir' => $hadir,
+                        'izin' => $izin,
+                        'sakit' => $sakit,
+                        'absen' => $absen_val,
                         'keterangan' => $absen['keterangan'] ?? null
                     ]);
                     $updated++;
@@ -317,10 +407,10 @@ class AbsensiController extends BaseGuruController
                 'total_pertemuan' => $absensi->pluck('pertemuan_id')->unique()->count(),
                 'total_siswa' => $absensi->pluck('siswa_id')->unique()->count(),
                 'rekap_status' => [
-                    'hadir' => $absensi->where('status', 'hadir')->count(),
-                    'izin' => $absensi->where('status', 'izin')->count(),
-                    'sakit' => $absensi->where('status', 'sakit')->count(),
-                    'alpha' => $absensi->where('status', 'alpha')->count(),
+                    'hadir' => $absensi->where('hadir', 1)->count(),
+                    'izin' => $absensi->where('izin', 1)->count(),
+                    'sakit' => $absensi->where('sakit', 1)->count(),
+                    'absen' => $absensi->where('absen', 1)->count(),
                 ]
             ];
             
@@ -340,12 +430,15 @@ class AbsensiController extends BaseGuruController
                             'hadir' => 0,
                             'izin' => 0,
                             'sakit' => 0,
-                            'alpha' => 0
+                            'absen' => 0
                         ]
                     ];
                 }
                 
-                $rekapSiswa[$siswaId]['rekap'][$absen->status]++;
+                if ($absen->hadir == 1) $rekapSiswa[$siswaId]['rekap']['hadir']++;
+                if ($absen->izin == 1) $rekapSiswa[$siswaId]['rekap']['izin']++;
+                if ($absen->sakit == 1) $rekapSiswa[$siswaId]['rekap']['sakit']++;
+                if ($absen->absen == 1) $rekapSiswa[$siswaId]['rekap']['absen']++;
             }
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan rekap bulanan", [
@@ -356,6 +449,153 @@ class AbsensiController extends BaseGuruController
             ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
+    public function getSiswaForAbsensi(Request $request)
+    {
+        try {
+            $this->validate($request, [
+                'kelas_id' => 'required|exists:kelas,id',
+                'bulan' => 'nullable|integer|min:1|max:12',
+                'tahun' => 'nullable|integer|min:2000|max:2100',
+            ]);
+            
+            $guru = Auth::user()->guru;
+            $bulan = $request->bulan ?? date('m');
+            $tahun = $request->tahun ?? date('Y');
+            
+            // Cek apakah guru mengajar di kelas ini
+            $kelasExists = \App\Models\MataPelajaran::where('guru_id', $guru->id)
+                ->where('kelas_id', $request->kelas_id)
+                ->exists();
+                
+            if (!$kelasExists) {
+                return ResponseBuilder::error(403, "Anda tidak memiliki akses ke kelas ini");
+            }
+            
+            // Ambil data siswa di kelas tersebut
+            $siswa = \App\Models\Siswa::where('kelas_id', $request->kelas_id)
+                ->where('sekolah_id', $guru->sekolah_id)
+                ->orderBy('nama', 'asc')
+                ->get();
+                
+            // Hitung total pertemuan di bulan ini
+            $totalPertemuan = \App\Models\Pertemuan::where('kelas_id', $request->kelas_id)
+                ->whereMonth('tanggal', $bulan)
+                ->whereYear('tanggal', $tahun)
+                ->count();
+                
+            // Format data untuk frontend
+            $data = [
+                'bulan' => $bulan,
+                'tahun' => $tahun,
+                'total_pertemuan' => $totalPertemuan,
+                'siswa' => $siswa->map(function($item) use ($bulan, $tahun) {
+                    // Ambil rekap absensi siswa di bulan ini
+                    $absensi = AbsensiSiswa::whereHas('pertemuan', function($q) use ($bulan, $tahun) {
+                        $q->whereMonth('tanggal', $bulan)
+                          ->whereYear('tanggal', $tahun);
+                    })
+                    ->where('siswa_id', $item->id)
+                    ->get();
+                    
+                    return [
+                        'id' => $item->id,
+                        'nama' => $item->nama,
+                        'rekap' => [
+                            'hadir' => $absensi->where('hadir', 1)->count(),
+                            'izin' => $absensi->where('izin', 1)->count(),
+                            'sakit' => $absensi->where('sakit', 1)->count(),
+                            'absen' => $absensi->where('absen', 1)->count(),
+                        ]
+                    ];
+                })
+            ];
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data siswa untuk absensi", $data);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
+    public function storeBulanan(Request $request)
+    {
+        $this->validate($request, [
+            'kelas_id' => 'required|exists:kelas,id',
+            'mata_pelajaran_id' => 'required|exists:mata_pelajaran,id',
+            'bulan' => 'required|integer|min:1|max:12',
+            'tahun' => 'required|integer|min:2000|max:2100',
+            'total_pertemuan' => 'required|integer|min:1',
+            'absensi' => 'required|array',
+            'absensi.*.siswa_id' => 'required|exists:siswa,id',
+            'absensi.*.hadir' => 'required|integer|min:0',
+            'absensi.*.izin' => 'required|integer|min:0',
+            'absensi.*.sakit' => 'required|integer|min:0'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            $guru = Auth::user()->guru;
+            
+            // Validasi total pertemuan
+            $totalHadir = $request->total_pertemuan;
+            
+            // Validasi jumlah kehadiran tidak melebihi total pertemuan
+            foreach ($request->absensi as $absen) {
+                $totalKehadiran = $absen['hadir'] + $absen['izin'] + $absen['sakit'];
+                if ($totalKehadiran > $totalHadir) {
+                    return ResponseBuilder::error(400, "Total kehadiran siswa tidak boleh melebihi total pertemuan");
+                }
+                
+                // Hitung jumlah absen
+                $absen_val = $totalHadir - $totalKehadiran;
+                
+                // Cek apakah sudah ada rekap bulanan
+                $existingRekap = \App\Models\RekapBulanan::where('siswa_id', $absen['siswa_id'])
+                    ->where('kelas_id', $request->kelas_id)
+                    ->where('mata_pelajaran_id', $request->mata_pelajaran_id)
+                    ->where('bulan', $request->bulan)
+                    ->where('tahun', $request->tahun)
+                    ->first();
+                    
+                if ($existingRekap) {
+                    // Update rekap yang sudah ada
+                    $existingRekap->update([
+                        'total_pertemuan' => $totalHadir,
+                        'hadir' => $absen['hadir'],
+                        'izin' => $absen['izin'],
+                        'sakit' => $absen['sakit'],
+                        'absen' => $absen_val,
+                        'updated_by' => Auth::user()->id
+                    ]);
+                } else {
+                    // Buat rekap baru
+                    \App\Models\RekapBulanan::create([
+                        'id' => Uuid::uuid4()->toString(),
+                        'siswa_id' => $absen['siswa_id'],
+                        'kelas_id' => $request->kelas_id,
+                        'mata_pelajaran_id' => $request->mata_pelajaran_id,
+                        'bulan' => $request->bulan,
+                        'tahun' => $request->tahun,
+                        'total_pertemuan' => $totalHadir,
+                        'hadir' => $absen['hadir'],
+                        'izin' => $absen['izin'],
+                        'sakit' => $absen['sakit'],
+                        'absen' => $absen_val,
+                        'created_by' => Auth::user()->id,
+                        'sekolah_id' => $guru->sekolah_id
+                    ]);
+                }
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(201, "Berhasil menyimpan rekap absensi bulanan");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menyimpan rekap absensi: " . $e->getMessage());
         }
     }
 } 

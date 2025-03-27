@@ -1068,6 +1068,8 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
             $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
             $router->get('/export', 'Guru\AbsensiController@export');
+            $router->get('/siswa-for-absensi', 'Guru\AbsensiController@getSiswaForAbsensi');
+            $router->post('/bulanan', 'Guru\AbsensiController@storeBulanan');
         });
     });
 

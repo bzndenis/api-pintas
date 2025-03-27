@@ -91,15 +91,26 @@ class RekapController extends BaseGuruController
                 'total_pertemuan' => $absensi->pluck('pertemuan_id')->unique()->count(),
                 'total_siswa' => $absensi->pluck('siswa_id')->unique()->count(),
                 'rekap_status' => [
-                    'hadir' => $absensi->where('status', 'hadir')->count(),
-                    'izin' => $absensi->where('status', 'izin')->count(),
-                    'sakit' => $absensi->where('status', 'sakit')->count(),
-                    'alpha' => $absensi->where('status', 'alpha')->count(),
+                    'hadir' => $absensi->where('hadir', 1)->count(),
+                    'izin' => $absensi->where('izin', 1)->count(),
+                    'sakit' => $absensi->where('sakit', 1)->count(),
+                    'absen' => $absensi->where('absen', 1)->count(),
                 ]
             ];
             
+            // Transformasi data untuk frontend
+            $transformedAbsensi = $absensi->map(function($item) {
+                $status = 'hadir';
+                if ($item->izin == 1) $status = 'izin';
+                if ($item->sakit == 1) $status = 'sakit';
+                if ($item->absen == 1) $status = 'absen';
+                
+                $item->status = $status;
+                return $item;
+            });
+            
             $data = [
-                'absensi' => $absensi,
+                'absensi' => $transformedAbsensi,
                 'statistik' => $statistik
             ];
             
