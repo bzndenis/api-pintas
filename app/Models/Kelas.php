@@ -45,9 +45,9 @@ class Kelas extends Model
         });
     }
     
-    public function tahunAjaran()
+    public function waliKelas()
     {
-        return $this->belongsTo(TahunAjaran::class, 'tahun', 'nama_tahun_ajaran');
+        return $this->belongsTo(Guru::class, 'guru_id');
     }
     
     public function guru()
@@ -68,5 +68,17 @@ class Kelas extends Model
     public function pertemuanBulanan()
     {
         return $this->hasMany(PertemuanBulanan::class);
+    }
+    
+    public function mataPelajaran()
+    {
+        return $this->hasManyThrough(
+            MataPelajaran::class,
+            Guru::class,
+            'id',
+            'guru_id',
+            'guru_id',
+            'id'
+        );
     }
 } 

@@ -59,4 +59,11 @@ class MataPelajaran extends Model
     {
         return $this->belongsTo(Guru::class);
     }
+
+    public function scopeForKelas($query, $kelasId)
+    {
+        return $query->whereHas('guru', function($q) use ($kelasId) {
+            $q->where('kelas_id', $kelasId);
+        });
+    }
 } 

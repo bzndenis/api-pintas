@@ -60,6 +60,8 @@ class DashboardController extends BaseGuruController
                 return ResponseBuilder::error(404, "Data kelas tidak ditemukan");
             }
             
+            $mataPelajaran = MataPelajaran::forKelas($kelas->id)->where('guru_id', $guru->id)->get();
+            
             return ResponseBuilder::success(200, "Berhasil mendapatkan detail kelas", ['kelas' => $kelas]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
