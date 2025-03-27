@@ -8,6 +8,7 @@ class BaseGuruController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['login', 'guru']);
+        $this->middleware('login');
+        $this->middleware('guru');
     }
 } 
