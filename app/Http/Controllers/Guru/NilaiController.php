@@ -259,10 +259,7 @@ class NilaiController extends BaseGuruController
     {
         $this->validate($request, [
             'kelas_id' => 'required|exists:kelas,id',
-            'capaian_pembelajaran_id' => 'required|exists:capaian_pembelajaran,id',
-            'jenis_nilai' => 'required|in:UH,STS,SAS',
-            'nomor_uh' => 'required_if:jenis_nilai,UH|nullable|integer|min:1|max:3',
-            'semester' => 'required|in:1,2'
+            'capaian_pembelajaran_id' => 'required|exists:capaian_pembelajaran,id'
         ]);
 
         try {
@@ -281,14 +278,14 @@ class NilaiController extends BaseGuruController
                 ->where('sekolah_id', Auth::user()->sekolah_id)
                 ->where('is_active', 1)
                 ->orderBy('nama', 'asc')
-                ->get(['id', 'nama', 'nis', 'nisn']);
+                ->get(['id', 'nama', 'nisn']);
                 
             if ($siswa->isEmpty()) {
                 return ResponseBuilder::error(404, "Tidak ada siswa di kelas ini");
             }
             
             // Dapatkan semua tujuan pembelajaran dari CP ini
-            $tujuanPembelajaran = TujuanPembelajaran::where('capaian_pembelajaran_id', $request->capaian_pembelajaran_id)
+            $tujuanPembelajaran = TujuanPembelajaran::where('cp_id', $request->capaian_pembelajaran_id)
                 ->where('sekolah_id', Auth::user()->sekolah_id)
                 ->get(['id', 'kode_tp', 'deskripsi']);
                 
@@ -302,30 +299,18 @@ class NilaiController extends BaseGuruController
                 foreach ($tujuanPembelajaran as $tp) {
                     // Cek apakah nilai sudah ada
                     $existingNilai = NilaiSiswa::where('siswa_id', $s->id)
-                        ->where('tujuan_pembelajaran_id', $tp->id)
-                        ->where('semester', $request->semester)
-                        ->where('jenis_nilai', $request->jenis_nilai)
-                        ->where(function($query) use ($request) {
-                            if ($request->jenis_nilai === 'UH') {
-                                $query->where('nomor_uh', $request->nomor_uh);
-                            }
-                        })
+                        ->where('tp_id', $tp->id)
+                        ->where('sekolah_id', Auth::user()->sekolah_id)
                         ->first();
                     
                     $templateData[] = [
                         'siswa_id' => $s->id,
                         'nama_siswa' => $s->nama,
-                        'nis' => $s->nis,
                         'nisn' => $s->nisn,
-                        'tujuan_pembelajaran_id' => $tp->id,
+                        'tp_id' => $tp->id,
                         'kode_tp' => $tp->kode_tp,
                         'deskripsi_tp' => $tp->deskripsi,
-                        'nilai' => $existingNilai ? $existingNilai->nilai : null,
-                        'semester' => $request->semester,
-                        'jenis_nilai' => $request->jenis_nilai,
-                        'nomor_uh' => $request->jenis_nilai === 'UH' ? $request->nomor_uh : null,
-                        'keterangan' => $existingNilai ? $existingNilai->keterangan : null,
-                        'status' => $existingNilai ? 'Sudah ada' : 'Belum ada'
+                        'nilai' => $existingNilai ? $existingNilai->nilai : null
                     ];
                 }
             }
@@ -335,9 +320,6 @@ class NilaiController extends BaseGuruController
                 'kelas' => Kelas::find($request->kelas_id)->nama_kelas,
                 'capaian_pembelajaran' => $cp->deskripsi,
                 'mata_pelajaran' => $cp->mataPelajaran->nama_mapel,
-                'jenis_nilai' => $request->jenis_nilai,
-                'nomor_uh' => $request->jenis_nilai === 'UH' ? $request->nomor_uh : null,
-                'semester' => $request->semester,
                 'jumlah_siswa' => $siswa->count(),
                 'jumlah_tp' => $tujuanPembelajaran->count()
             ];
@@ -360,14 +342,7 @@ class NilaiController extends BaseGuruController
     public function import(Request $request)
     {
         $this->validate($request, [
-            'nilai_import' => 'required|array|min:1',
-            'nilai_import.*.siswa_id' => 'required|exists:siswa,id',
-            'nilai_import.*.tujuan_pembelajaran_id' => 'required|exists:tujuan_pembelajaran,id',
-            'nilai_import.*.nilai' => 'required|numeric|min:0|max:100',
-            'nilai_import.*.semester' => 'required|in:1,2',
-            'nilai_import.*.jenis_nilai' => 'required|in:UH,STS,SAS',
-            'nilai_import.*.nomor_uh' => 'required_if:nilai_import.*.jenis_nilai,UH|nullable|integer|min:1|max:3',
-            'nilai_import.*.keterangan' => 'nullable|string'
+            'file' => 'required|file|mimes:xlsx,xls|max:2048',
         ]);
 
         try {
@@ -383,7 +358,7 @@ class NilaiController extends BaseGuruController
                 try {
                     // Validasi apakah guru mengajar mata pelajaran tersebut
                     $tp = TujuanPembelajaran::with('capaianPembelajaran.mataPelajaran')
-                        ->find($nilaiData['tujuan_pembelajaran_id']);
+                        ->find($nilaiData['tp_id']);
                         
                     if (!$tp || $tp->capaianPembelajaran->mataPelajaran->guru_id !== $guru->id) {
                         $errors[] = [
@@ -395,21 +370,14 @@ class NilaiController extends BaseGuruController
 
                     // Cek apakah nilai sudah ada
                     $existingNilai = NilaiSiswa::where('siswa_id', $nilaiData['siswa_id'])
-                        ->where('tujuan_pembelajaran_id', $nilaiData['tujuan_pembelajaran_id'])
-                        ->where('semester', $nilaiData['semester'])
-                        ->where('jenis_nilai', $nilaiData['jenis_nilai'])
-                        ->where(function($query) use ($nilaiData) {
-                            if ($nilaiData['jenis_nilai'] === 'UH') {
-                                $query->where('nomor_uh', $nilaiData['nomor_uh']);
-                            }
-                        })
+                        ->where('tp_id', $nilaiData['tp_id'])
+                        ->where('sekolah_id', Auth::user()->sekolah_id)
                         ->first();
                     
                     if ($existingNilai) {
                         // Update nilai yang sudah ada
                         $existingNilai->update([
-                            'nilai' => $nilaiData['nilai'],
-                            'keterangan' => $nilaiData['keterangan'] ?? null
+                            'nilai' => $nilaiData['nilai']
                         ]);
                         
                         $hasilUpdate[] = $existingNilai;
@@ -417,13 +385,9 @@ class NilaiController extends BaseGuruController
                         // Buat nilai baru
                         $nilai = NilaiSiswa::create([
                             'siswa_id' => $nilaiData['siswa_id'],
-                            'tujuan_pembelajaran_id' => $nilaiData['tujuan_pembelajaran_id'],
+                            'tp_id' => $nilaiData['tp_id'],
                             'nilai' => $nilaiData['nilai'],
-                            'semester' => $nilaiData['semester'],
-                            'jenis_nilai' => $nilaiData['jenis_nilai'],
-                            'nomor_uh' => $nilaiData['nomor_uh'] ?? null,
-                            'keterangan' => $nilaiData['keterangan'] ?? null,
-                            'guru_id' => $guru->id,
+                            'created_by' => Auth::id(),
                             'sekolah_id' => $guru->sekolah_id
                         ]);
                         
