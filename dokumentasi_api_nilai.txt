@@ -1,0 +1,332 @@
+DOKUMENTASI API PENILAIAN GURU
+=============================
+
+BASE URL: http://your-domain.com/api
+
+1. MENDAPATKAN DATA NILAI
+------------------------
+GET /guru/nilai
+Headers:
+- Authorization: Bearer {token}
+Query Parameters (opsional):
+- kelas_id: UUID kelas
+- semester: 1 atau 2
+- capaian_pembelajaran_id: UUID CP
+- jenis_nilai: UH/STS/SAS
+
+Response Success:
+{
+    "status": true,
+    "code": 200,
+    "message": "Berhasil mendapatkan data nilai",
+    "data": [
+        {
+            "id": "uuid-nilai",
+            "siswa_id": "uuid-siswa",
+            "tujuan_pembelajaran_id": "uuid-tp",
+            "nilai": 85,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1,
+            "keterangan": "Ulangan Harian Bab 1",
+            "guru_id": "uuid-guru",
+            "sekolah_id": "uuid-sekolah",
+            "created_at": "2024-03-26 10:00:00",
+            "updated_at": "2024-03-26 10:00:00",
+            "siswa": {
+                "id": "uuid-siswa",
+                "nama": "Nama Siswa",
+                "nis": "12345",
+                "nisn": "1234567890",
+                "kelas": {
+                    "id": "uuid-kelas",
+                    "nama_kelas": "X IPA 1"
+                }
+            },
+            "tujuan_pembelajaran": {
+                "id": "uuid-tp",
+                "kode_tp": "TP-1",
+                "deskripsi": "Deskripsi TP",
+                "capaian_pembelajaran": {
+                    "id": "uuid-cp",
+                    "kode_cp": "CP-1",
+                    "deskripsi": "Deskripsi CP",
+                    "mata_pelajaran": {
+                        "id": "uuid-mapel",
+                        "nama_mapel": "Matematika"
+                    }
+                }
+            }
+        }
+    ]
+}
+
+2. MENAMBAH NILAI SISWA (SINGLE)
+------------------------------
+POST /guru/nilai
+Headers:
+- Authorization: Bearer {token}
+- Content-Type: application/json
+
+Body (raw JSON):
+{
+    "siswa_id": "uuid-siswa",
+    "tujuan_pembelajaran_id": "uuid-tp",
+    "nilai": 85,
+    "semester": 1,
+    "jenis_nilai": "UH",
+    "nomor_uh": 1,
+    "keterangan": "Ulangan Harian Bab 1"
+}
+
+3. MENAMBAH NILAI SISWA (BATCH)
+-----------------------------
+POST /guru/nilai/batch
+Headers:
+- Authorization: Bearer {token}
+- Content-Type: application/json
+
+Body (raw JSON):
+{
+    "nilai_batch": [
+        {
+            "siswa_id": "uuid-siswa-1",
+            "tujuan_pembelajaran_id": "uuid-tp",
+            "nilai": 85,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1,
+            "keterangan": "Ulangan Harian Bab 1"
+        },
+        {
+            "siswa_id": "uuid-siswa-2",
+            "tujuan_pembelajaran_id": "uuid-tp",
+            "nilai": 90,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1,
+            "keterangan": "Ulangan Harian Bab 1"
+        }
+    ]
+}
+
+4. MENDAPATKAN TEMPLATE NILAI
+---------------------------
+GET /guru/nilai/template
+Headers:
+- Authorization: Bearer {token}
+Query Parameters (required):
+- kelas_id: UUID kelas
+- capaian_pembelajaran_id: UUID CP
+- jenis_nilai: UH/STS/SAS
+- nomor_uh: 1-3 (required jika jenis_nilai=UH)
+- semester: 1 atau 2
+
+Response Success:
+{
+    "status": true,
+    "code": 200,
+    "message": "Berhasil membuat template nilai",
+    "data": {
+        "template_info": {
+            "kelas": "X IPA 1",
+            "capaian_pembelajaran": "Deskripsi CP",
+            "mata_pelajaran": "Matematika",
+            "jenis_nilai": "UH",
+            "nomor_uh": 1,
+            "semester": 1,
+            "jumlah_siswa": 30,
+            "jumlah_tp": 5
+        },
+        "template_data": [
+            {
+                "siswa_id": "uuid-siswa",
+                "nama_siswa": "Nama Siswa",
+                "nis": "12345",
+                "nisn": "1234567890",
+                "tujuan_pembelajaran": [
+                    {
+                        "id": "uuid-tp",
+                        "kode_tp": "TP-1",
+                        "deskripsi": "Deskripsi TP"
+                    }
+                ]
+            }
+        ]
+    }
+}
+
+5. IMPORT NILAI DARI TEMPLATE
+---------------------------
+POST /guru/nilai/import
+Headers:
+- Authorization: Bearer {token}
+- Content-Type: application/json
+
+Body (raw JSON):
+{
+    "nilai_import": [
+        {
+            "siswa_id": "uuid-siswa-1",
+            "tujuan_pembelajaran_id": "uuid-tp-1",
+            "nilai": 85,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1
+        },
+        {
+            "siswa_id": "uuid-siswa-2",
+            "tujuan_pembelajaran_id": "uuid-tp-1",
+            "nilai": 90,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1
+        }
+    ]
+}
+
+6. UPDATE NILAI SISWA
+-------------------
+PUT /guru/nilai/{id}
+Headers:
+- Authorization: Bearer {token}
+- Content-Type: application/json
+
+Body (raw JSON):
+{
+    "nilai": 85,
+    "keterangan": "Nilai setelah remedial"
+}
+
+7. REKAP NILAI
+-------------
+GET /guru/nilai/rekap
+Headers:
+- Authorization: Bearer {token}
+Query Parameters (opsional):
+- kelas_id: UUID kelas
+- semester: 1 atau 2
+
+8. EXPORT NILAI
+-------------
+GET /guru/nilai/export
+Headers:
+- Authorization: Bearer {token}
+Query Parameters (opsional):
+- kelas_id: UUID kelas
+- semester: 1 atau 2
+- capaian_pembelajaran_id: UUID CP
+- jenis_nilai: "UH" atau "STS" atau "SAS"
+- nomor_uh: 1-3 (opsional, hanya untuk jenis_nilai=UH)
+
+9. DETAIL NILAI SISWA
+-------------------
+GET /guru/nilai/{id}
+Headers:
+- Authorization: Bearer {token}
+
+CATATAN:
+--------
+1. Semua endpoint memerlukan token JWT yang valid
+2. Format UUID menggunakan standar UUID v4
+3. Nilai harus dalam rentang 0-100
+4. Jenis nilai yang valid: UH (Ulangan Harian), STS (Semester Tengah Semester), SAS (Semester Akhir Semester)
+5. Nomor UH hanya diperlukan untuk jenis nilai UH (rentang 1-3)
+6. Semester hanya menerima nilai 1 atau 2
+
+KODE RESPONSE:
+-------------
+200: Sukses mendapatkan data
+201: Sukses membuat data baru
+400: Validasi error atau request tidak valid
+403: Tidak memiliki akses
+404: Data tidak ditemukan
+500: Server error
+
+Contoh Response Sukses:
+{
+    "status": true,
+    "code": 200,
+    "message": "Berhasil mendapatkan data nilai",
+    "data": [
+        {
+            "id": "uuid-nilai",
+            "siswa_id": "uuid-siswa",
+            "nilai": 85,
+            "semester": 1,
+            "jenis_nilai": "UH",
+            "nomor_uh": 1,
+            "keterangan": "Ulangan Harian Bab 1",
+            "created_at": "2024-03-26 10:00:00",
+            "updated_at": "2024-03-26 10:00:00"
+        }
+    ]
+}
+
+Contoh Response Error:
+{
+    "status": false,
+    "code": 400,
+    "message": "Nilai UH 1 untuk siswa ini sudah ada",
+    "data": null
+}
+
+ENDPOINT TERKAIT CAPAIAN PEMBELAJARAN:
+------------------------------------
+1. GET /guru/capaian-pembelajaran
+   Mendapatkan daftar capaian pembelajaran yang diajarkan oleh guru
+
+2. POST /guru/capaian-pembelajaran
+   Menambahkan capaian pembelajaran baru
+
+3. GET /guru/capaian-pembelajaran/{id}
+   Mendapatkan detail capaian pembelajaran
+
+4. PUT /guru/capaian-pembelajaran/{id}
+   Mengupdate capaian pembelajaran
+
+5. DELETE /guru/capaian-pembelajaran/{id}
+   Menghapus capaian pembelajaran
+
+ENDPOINT TERKAIT TUJUAN PEMBELAJARAN:
+-----------------------------------
+1. GET /guru/tujuan-pembelajaran
+   Mendapatkan daftar tujuan pembelajaran
+
+2. POST /guru/tujuan-pembelajaran
+   Menambahkan tujuan pembelajaran baru
+
+3. GET /guru/tujuan-pembelajaran/{id}
+   Mendapatkan detail tujuan pembelajaran
+
+4. PUT /guru/tujuan-pembelajaran/{id}
+   Mengupdate tujuan pembelajaran
+
+5. DELETE /guru/tujuan-pembelajaran/{id}
+   Menghapus tujuan pembelajaran
+
+ENDPOINT TERKAIT ABSENSI:
+-----------------------
+1. GET /guru/absensi
+   Mendapatkan data absensi siswa
+
+2. POST /guru/absensi
+   Menambahkan data absensi pertemuan baru
+
+3. GET /guru/absensi/rekap-bulanan
+   Mendapatkan rekap absensi bulanan
+
+4. POST /guru/absensi/bulanan
+   Menyimpan rekap absensi bulanan
+
+5. GET /guru/absensi/export
+   Mengexport data absensi ke Excel
+
+6. GET /guru/absensi/siswa-for-absensi
+   Mendapatkan daftar siswa untuk absensi
+
+7. GET /guru/absensi/{id}
+   Mendapatkan detail absensi
+
+8. PUT /guru/absensi/{id}
+   Mengupdate data absensi 

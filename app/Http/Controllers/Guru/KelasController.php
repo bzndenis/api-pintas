@@ -8,7 +8,7 @@ use App\Models\MataPelajaran;
 use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Uuid;
+use Ramsey\Uuid\Uuid;
 
 class KelasController extends BaseGuruController
 {

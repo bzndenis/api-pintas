@@ -1049,27 +1049,51 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/kelas/{id}', 'Guru\KelasController@show');
         $router->get('/kelas/{id}/siswa', 'Guru\KelasController@listSiswa');
         
+        // Capaian Pembelajaran
+        $router->group(['prefix' => 'capaian-pembelajaran'], function () use ($router) {
+            $router->get('/', 'Guru\CapaianPembelajaranController@index');
+            $router->post('/', 'Guru\CapaianPembelajaranController@store');
+            $router->get('/{id}', 'Guru\CapaianPembelajaranController@show');
+            $router->put('/{id}', 'Guru\CapaianPembelajaranController@update');
+            $router->delete('/{id}', 'Guru\CapaianPembelajaranController@destroy');
+        });
+        
+        // Tujuan Pembelajaran
+        $router->group(['prefix' => 'tujuan-pembelajaran'], function () use ($router) {
+            $router->get('/', 'Guru\TujuanPembelajaranController@index');
+            $router->post('/', 'Guru\TujuanPembelajaranController@store');
+            $router->get('/{id}', 'Guru\TujuanPembelajaranController@show');
+            $router->put('/{id}', 'Guru\TujuanPembelajaranController@update');
+            $router->delete('/{id}', 'Guru\TujuanPembelajaranController@destroy');
+        });
+        
         // Penilaian Siswa
         $router->group(['prefix' => 'nilai'], function () use ($router) {
             $router->get('/', 'Guru\NilaiController@index');
             $router->post('/', 'Guru\NilaiController@store');
-            $router->get('/{id}', 'Guru\NilaiController@show');
-            $router->put('/{id}', 'Guru\NilaiController@update');
+            $router->post('/batch', 'Guru\NilaiController@storeBatch');
+            $router->get('/template', 'Guru\NilaiController@getTemplate');
+            $router->post('/import', 'Guru\NilaiController@import');
             $router->get('/rekap', 'Guru\RekapController@nilai');
             $router->get('/export', 'Guru\NilaiController@export');
+            $router->get('/{id}', 'Guru\NilaiController@show');
+            $router->put('/{id}', 'Guru\NilaiController@update');
         });
         
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
+            // Rute statis dulu
             $router->get('/', 'Guru\AbsensiController@index');
             $router->post('/', 'Guru\AbsensiController@store');
-            $router->get('/{id}', 'Guru\AbsensiController@show');
-            $router->put('/{id}', 'Guru\AbsensiController@update');
             $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
             $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
             $router->get('/export', 'Guru\AbsensiController@export');
             $router->get('/siswa-for-absensi', 'Guru\AbsensiController@getSiswaForAbsensi');
             $router->post('/bulanan', 'Guru\AbsensiController@storeBulanan');
+            
+            // Rute dengan parameter di akhir
+            $router->get('/{id}', 'Guru\AbsensiController@show');
+            $router->put('/{id}', 'Guru\AbsensiController@update');
         });
     });
 

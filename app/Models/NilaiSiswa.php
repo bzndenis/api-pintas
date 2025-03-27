@@ -15,22 +15,31 @@ class NilaiSiswa extends Model
     protected $fillable = [
         'id',
         'siswa_id',
-        'tp_id',
+        'tujuan_pembelajaran_id',
         'nilai',
-        'created_by',
+        'semester',
+        'jenis_nilai',
+        'nomor_uh',
+        'keterangan',
+        'guru_id',
         'sekolah_id',
+        'created_by'
     ];
     
     protected $casts = [
         'nilai' => 'decimal:2',
+        'semester' => 'integer',
+        'nomor_uh' => 'integer',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
     
     protected $dates = [
         'created_at',
-        'updated_at',
+        'updated_at'
     ];
+    
+    protected $enumJenisNilai = ['S-1', 'S-2', 'S-3', 'S-4', 'S-5', 'S-6', 'S-7'];
     
     public static function boot()
     {
@@ -48,7 +57,12 @@ class NilaiSiswa extends Model
     
     public function tujuanPembelajaran()
     {
-        return $this->belongsTo(TujuanPembelajaran::class, 'tp_id');
+        return $this->belongsTo(TujuanPembelajaran::class, 'tujuan_pembelajaran_id');
+    }
+    
+    public function guru()
+    {
+        return $this->belongsTo(Guru::class);
     }
     
     public function createdBy()
