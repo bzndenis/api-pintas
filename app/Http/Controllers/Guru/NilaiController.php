@@ -51,12 +51,8 @@ class NilaiController extends BaseGuruController
     {
         $this->validate($request, [
             'siswa_id' => 'required|exists:siswa,id',
-            'tujuan_pembelajaran_id' => 'required|exists:tujuan_pembelajaran,id',
-            'nilai' => 'required|numeric|min:0|max:100',
-            'semester' => 'required|in:1,2',
-            'jenis_nilai' => 'required|in:UH,STS,SAS',
-            'nomor_uh' => 'required_if:jenis_nilai,UH|nullable|integer|min:1|max:7',
-            'keterangan' => 'nullable|string'
+            'tp_id' => 'required|exists:tujuan_pembelajaran,id',
+            'nilai' => 'required|numeric|min:0|max:100'
         ]);
 
         try {
@@ -64,26 +60,19 @@ class NilaiController extends BaseGuruController
             
             $guru = Auth::user()->guru;
             
-            // Tambahan validasi untuk mencegah duplikasi nilai
-            $existingNilai = NilaiSiswa::where('siswa_id', $request->siswa_id)
-                ->where('tujuan_pembelajaran_id', $request->tujuan_pembelajaran_id)
-                ->where('jenis_nilai', $request->jenis_nilai)
-                ->where('nomor_uh', $request->nomor_uh)
-                ->exists();
+            // Validasi apakah guru mengajar mata pelajaran tersebut
+            $tp = TujuanPembelajaran::with('capaianPembelajaran.mataPelajaran')
+                ->find($request->tp_id);
                 
-            if ($existingNilai) {
-                return ResponseBuilder::error(400, "Nilai untuk sesi ini sudah ada");
+            if (!$tp || $tp->capaianPembelajaran->mataPelajaran->guru_id !== $guru->id) {
+                return ResponseBuilder::error(403, "Anda tidak memiliki akses untuk menilai mata pelajaran ini");
             }
 
-            // Proses penyimpanan nilai
             $nilai = NilaiSiswa::create([
                 'siswa_id' => $request->siswa_id,
-                'tujuan_pembelajaran_id' => $request->tujuan_pembelajaran_id,
+                'tp_id' => $request->tp_id,
                 'nilai' => $request->nilai,
-                'semester' => $request->semester,
-                'jenis_nilai' => $request->jenis_nilai,
-                'nomor_uh' => $request->nomor_uh,
-                'guru_id' => $guru->id,
+                'created_by' => $guru->user_id,
                 'sekolah_id' => $guru->sekolah_id
             ]);
 
@@ -478,23 +467,28 @@ class NilaiController extends BaseGuruController
         try {
             $guru = Auth::user()->guru;
             
-            $nilaiSiswa = NilaiSiswa::with(['siswa'])
-                ->where('guru_id', $guru->id)
-                ->where('semester', $request->semester)
+            // Dapatkan semua nilai siswa untuk mata pelajaran yang diajar guru
+            $nilaiSiswa = NilaiSiswa::with(['siswa', 'tujuanPembelajaran.capaianPembelajaran.mataPelajaran'])
+                ->whereHas('tujuanPembelajaran.capaianPembelajaran.mataPelajaran', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                })
                 ->get()
                 ->groupBy('siswa_id')
                 ->map(function($nilai) {
                     $siswa = $nilai->first()->siswa;
-                    return [
+                    // Urutkan nilai berdasarkan urutan tp_id
+                    $nilaiUrut = $nilai->sortBy('tp_id')->values();
+                    
+                    $data = [
                         'nama' => $siswa->nama,
-                        'S-1' => $nilai->where('jenis_nilai', 'S-1')->first()->nilai ?? null,
-                        'S-2' => $nilai->where('jenis_nilai', 'S-2')->first()->nilai ?? null,
-                        'S-3' => $nilai->where('jenis_nilai', 'S-3')->first()->nilai ?? null,
-                        'S-4' => $nilai->where('jenis_nilai', 'S-4')->first()->nilai ?? null,
-                        'S-5' => $nilai->where('jenis_nilai', 'S-5')->first()->nilai ?? null,
-                        'S-6' => $nilai->where('jenis_nilai', 'S-6')->first()->nilai ?? null,
-                        'S-7' => $nilai->where('jenis_nilai', 'S-7')->first()->nilai ?? null,
                     ];
+                    
+                    // Tambahkan nilai sesuai urutan
+                    foreach($nilaiUrut as $index => $n) {
+                        $data['S-'.($index+1)] = $n->nilai;
+                    }
+                    
+                    return $data;
                 });
                 
             return ResponseBuilder::success(200, "Berhasil mendapatkan rekap nilai", $nilaiSiswa);

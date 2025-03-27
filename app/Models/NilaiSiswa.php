@@ -15,21 +15,14 @@ class NilaiSiswa extends Model
     protected $fillable = [
         'id',
         'siswa_id',
-        'tujuan_pembelajaran_id',
+        'tp_id',
         'nilai',
-        'semester',
-        'jenis_nilai',
-        'nomor_uh',
-        'keterangan',
-        'guru_id',
-        'sekolah_id',
-        'created_by'
+        'created_by',
+        'sekolah_id'
     ];
     
     protected $casts = [
         'nilai' => 'decimal:2',
-        'semester' => 'integer',
-        'nomor_uh' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
@@ -57,7 +50,7 @@ class NilaiSiswa extends Model
     
     public function tujuanPembelajaran()
     {
-        return $this->belongsTo(TujuanPembelajaran::class, 'tujuan_pembelajaran_id');
+        return $this->belongsTo(TujuanPembelajaran::class, 'tp_id');
     }
     
     public function guru()
