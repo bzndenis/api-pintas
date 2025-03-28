@@ -16,6 +16,11 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class SiswaController extends BaseAdminController
 {
+    public function __construct()
+    {
+        $this->middleware('autologout');
+    }
+
     public function index(Request $request)
     {
         try {

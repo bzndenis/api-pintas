@@ -109,12 +109,14 @@ class CapaianPembelajaranController extends BaseGuruController
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'kode_cp' => 'required|string|max:50',
+            'kode_cp' => 'required|string|max:20',
             'deskripsi' => 'required|string',
             'mapel_id' => 'required|exists:mata_pelajaran,id'
         ]);
 
         try {
+            DB::beginTransaction();
+            
             $guru = Auth::user()->guru;
             
             // Validasi apakah guru mengajar mata pelajaran tersebut
@@ -136,10 +138,28 @@ class CapaianPembelajaranController extends BaseGuruController
                 return ResponseBuilder::error(404, "Capaian pembelajaran tidak ditemukan");
             }
             
-            $cp->update($request->all());
+            // Validasi kode CP unik per mapel dan sekolah (kecuali untuk CP yang sedang diupdate)
+            $existingCP = CapaianPembelajaran::where('kode_cp', $request->kode_cp)
+                ->where('mapel_id', $request->mapel_id)
+                ->where('sekolah_id', $guru->sekolah_id)
+                ->where('id', '!=', $id)
+                ->exists();
+                
+            if ($existingCP) {
+                return ResponseBuilder::error(400, "Kode CP sudah digunakan untuk mata pelajaran ini");
+            }
+            
+            $cp->update([
+                'kode_cp' => $request->kode_cp,
+                'deskripsi' => $request->deskripsi,
+                'mapel_id' => $request->mapel_id
+            ]);
+            
+            DB::commit();
             
             return ResponseBuilder::success(200, "Berhasil mengupdate capaian pembelajaran", $cp);
         } catch (\Exception $e) {
+            DB::rollBack();
             return ResponseBuilder::error(500, "Gagal mengupdate data: " . $e->getMessage());
         }
     }
@@ -175,6 +195,109 @@ class CapaianPembelajaranController extends BaseGuruController
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
+        }
+    }
+    
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'capaian' => 'required|array|min:1',
+            'capaian.*.kode_cp' => 'required|string|max:20',
+            'capaian.*.deskripsi' => 'required|string',
+            'capaian.*.mapel_id' => 'required|string|uuid|exists:mata_pelajaran,id'
+        ]);
+
+        try {
+            $guru = Auth::user()->guru;
+            \Log::info('Guru yang melakukan import CP: ', ['id' => $guru->id, 'sekolah_id' => $guru->sekolah_id]);
+            
+            $cpData = $request->capaian;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            // Nonaktifkan foreign key check sementara
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            DB::beginTransaction();
+            
+            foreach ($cpData as $index => $data) {
+                try {
+                    // Log data yang akan diproses
+                    \Log::info('Processing CP data: ', $data);
+                    
+                    // Validasi apakah guru mengajar mata pelajaran ini
+                    $mapelCount = $guru->mataPelajaran()
+                        ->where('id', $data['mapel_id'])
+                        ->count();
+                        
+                    if ($mapelCount === 0) {
+                        throw new \Exception("Anda tidak memiliki akses untuk mata pelajaran dengan ID: " . $data['mapel_id']);
+                    }
+                    
+                    // Validasi kode CP unik per mapel dan sekolah
+                    $existingCP = CapaianPembelajaran::where('kode_cp', $data['kode_cp'])
+                        ->where('mapel_id', $data['mapel_id'])
+                        ->where('sekolah_id', $guru->sekolah_id)
+                        ->exists();
+                        
+                    if ($existingCP) {
+                        throw new \Exception("Kode CP " . $data['kode_cp'] . " sudah digunakan untuk mata pelajaran ini");
+                    }
+                    
+                    // Buat UUID untuk capaian pembelajaran
+                    $cpId = (string) Str::uuid();
+                    
+                    // Buat data capaian pembelajaran langsung dengan DB::table
+                    $insertData = [
+                        'id' => $cpId,
+                        'kode_cp' => $data['kode_cp'],
+                        'deskripsi' => $data['deskripsi'],
+                        'mapel_id' => $data['mapel_id'],
+                        'sekolah_id' => $guru->sekolah_id,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ];
+                    
+                    DB::table('capaian_pembelajaran')->insert($insertData);
+                    
+                    \Log::info('Capaian pembelajaran created with ID: ' . $cpId);
+                    
+                    $importedData[] = [
+                        'id' => $cpId,
+                        'kode_cp' => $data['kode_cp'],
+                        'deskripsi' => $data['deskripsi'],
+                        'mapel_id' => $data['mapel_id']
+                    ];
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    \Log::error('Error creating CP: ' . $e->getMessage());
+                    \Log::error('Stack trace: ' . $e->getTraceAsString());
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'kode_cp' => $data['kode_cp'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            // Aktifkan kembali foreign key check
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data capaian pembelajaran", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            // Pastikan foreign key check diaktifkan kembali jika terjadi error
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            
+            \Log::error('Batch error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
         }
     }
 } 

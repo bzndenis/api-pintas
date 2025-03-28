@@ -18,6 +18,6 @@ class Kernel extends HttpKernel
         'activity.tracker' => \App\Http\Middleware\ActivityTrackerMiddleware::class,
         'login' => \App\Http\Middleware\LoginMiddleware::class,
         'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        'auto.logout' => \App\Http\Middleware\AutoLogoutMiddleware::class,
+        'autologout' => \App\Http\Middleware\AutoLogoutMiddleware::class,
     ];
 } 

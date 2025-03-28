@@ -1050,7 +1050,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/kelas/{id}/siswa', 'Guru\KelasController@listSiswa');
         
         // Capaian Pembelajaran
-        $router->group(['prefix' => 'capaian-pembelajaran'], function () use ($router) {
+        $router->group(['prefix' => 'cp'], function () use ($router) {
             $router->get('/', 'Guru\CapaianPembelajaranController@index');
             $router->post('/', 'Guru\CapaianPembelajaranController@store');
             $router->get('/{id}', 'Guru\CapaianPembelajaranController@show');

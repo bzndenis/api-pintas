@@ -81,4 +81,12 @@ class Kelas extends Model
             'id'
         );
     }
+
+    /**
+     * Relasi ke model TahunAjaran
+     */
+    public function tahunAjaran()
+    {
+        return $this->belongsTo(TahunAjaran::class, 'tahun_ajaran_id');
+    }
 } 

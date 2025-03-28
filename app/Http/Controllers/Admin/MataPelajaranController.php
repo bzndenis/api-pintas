@@ -15,6 +15,11 @@ use Ramsey\Uuid\Uuid;
 
 class MataPelajaranController extends BaseAdminController
 {
+    public function __construct()
+    {
+        $this->middleware('autologout');
+    }
+
     public function index()
     {
         try {

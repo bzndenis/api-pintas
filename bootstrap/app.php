@@ -106,6 +106,7 @@ $app->routeMiddleware([
     'admin' => App\Http\Middleware\AdminMiddleware::class,
     'guru' => App\Http\Middleware\GuruMiddleware::class,
     'activity.tracker' => App\Http\Middleware\ActivityTrackerMiddleware::class,
+    'autologout' => App\Http\Middleware\AutoLogoutMiddleware::class,
 ]);
 
 /*
