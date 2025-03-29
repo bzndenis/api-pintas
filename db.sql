@@ -177,23 +177,26 @@ CREATE TABLE `nilai_siswa`  (
 -- Table structure for pertemuan_bulanan
 -- ----------------------------
 DROP TABLE IF EXISTS `pertemuan_bulanan`;
-CREATE TABLE `pertemuan_bulanan`  (
+CREATE TABLE `pertemuan_bulanan` (
   `id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
   `kelas_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
-  `bulan` tinyint NOT NULL CHECK (bulan >= 1 AND bulan <= 12),
-  `tahun` smallint NOT NULL,
-  `total_pertemuan` tinyint NOT NULL CHECK (total_pertemuan >= 0),
+  `mata_pelajaran_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `bulan` tinyint NOT NULL,
+  `tahun` int NOT NULL,
+  `total_pertemuan` int NOT NULL DEFAULT 0,
   `created_by` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
   `sekolah_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `kelas_id`(`kelas_id` ASC, `bulan` ASC, `tahun` ASC, `sekolah_id` ASC) USING BTREE,
+  UNIQUE INDEX `unique_pertemuan`(`kelas_id` ASC, `mata_pelajaran_id` ASC, `bulan` ASC, `tahun` ASC, `sekolah_id` ASC) USING BTREE,
+  INDEX `mata_pelajaran_id`(`mata_pelajaran_id` ASC) USING BTREE,
   INDEX `created_by`(`created_by` ASC) USING BTREE,
   INDEX `sekolah_id`(`sekolah_id` ASC) USING BTREE,
   CONSTRAINT `pertemuan_bulanan_ibfk_1` FOREIGN KEY (`kelas_id`) REFERENCES `kelas` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
-  CONSTRAINT `pertemuan_bulanan_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
-  CONSTRAINT `pertemuan_bulanan_ibfk_3` FOREIGN KEY (`sekolah_id`) REFERENCES `sekolah` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+  CONSTRAINT `pertemuan_bulanan_ibfk_2` FOREIGN KEY (`mata_pelajaran_id`) REFERENCES `mata_pelajaran` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `pertemuan_bulanan_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `pertemuan_bulanan_ibfk_4` FOREIGN KEY (`sekolah_id`) REFERENCES `sekolah` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE = InnoDB CHARACTER SET = latin1 COLLATE = latin1_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------

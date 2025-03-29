@@ -50,11 +50,6 @@ class Kelas extends Model
         return $this->belongsTo(Guru::class, 'guru_id');
     }
     
-    public function guru()
-    {
-        return $this->belongsTo(Guru::class);
-    }
-    
     public function sekolah()
     {
         return $this->belongsTo(Sekolah::class);
@@ -68,18 +63,6 @@ class Kelas extends Model
     public function pertemuanBulanan()
     {
         return $this->hasMany(PertemuanBulanan::class);
-    }
-    
-    public function mataPelajaran()
-    {
-        return $this->hasManyThrough(
-            MataPelajaran::class,
-            Guru::class,
-            'id',
-            'guru_id',
-            'guru_id',
-            'id'
-        );
     }
 
     /**

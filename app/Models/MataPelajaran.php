@@ -60,10 +60,8 @@ class MataPelajaran extends Model
         return $this->belongsTo(Guru::class);
     }
 
-    public function scopeForKelas($query, $kelasId)
+    public function pertemuanBulanan()
     {
-        return $query->whereHas('guru', function($q) use ($kelasId) {
-            $q->where('kelas_id', $kelasId);
-        });
+        return $this->hasMany(PertemuanBulanan::class, 'mata_pelajaran_id');
     }
 } 

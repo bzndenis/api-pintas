@@ -15,6 +15,7 @@ class PertemuanBulanan extends Model
     protected $fillable = [
         'id',
         'kelas_id',
+        'mata_pelajaran_id',
         'bulan',
         'tahun',
         'total_pertemuan',
@@ -47,6 +48,11 @@ class PertemuanBulanan extends Model
     public function kelas()
     {
         return $this->belongsTo(Kelas::class);
+    }
+    
+    public function mataPelajaran()
+    {
+        return $this->belongsTo(MataPelajaran::class, 'mata_pelajaran_id');
     }
     
     public function createdBy()

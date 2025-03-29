@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class TujuanPembelajaranController extends BaseGuruController
 {
@@ -163,7 +165,7 @@ class TujuanPembelajaranController extends BaseGuruController
             DB::beginTransaction();
             
             // Cek apakah tujuan pembelajaran masih digunakan oleh nilai
-            if ($tp->nilai()->count() > 0) {
+            if ($tp->nilaiSiswa()->count() > 0) {
                 return ResponseBuilder::error(400, "Tidak dapat menghapus tujuan pembelajaran yang masih memiliki data nilai");
             }
             
@@ -178,4 +180,114 @@ class TujuanPembelajaranController extends BaseGuruController
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
         }
     }
-} 
+
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'data' => 'required|array|min:1',
+            'data.*.kode_tp' => 'required|string|max:20',
+            'data.*.deskripsi' => 'required|string',
+            'data.*.bobot' => 'required|numeric|min:0|max:100',
+            'data.*.cp_id' => 'required|string|uuid|exists:capaian_pembelajaran,id'
+        ]);
+
+        try {
+            $guru = Auth::user()->guru;
+            \Log::info('Guru yang melakukan import TP: ', ['id' => $guru->id, 'sekolah_id' => $guru->sekolah_id]);
+            
+            $tpData = $request->data;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            DB::beginTransaction();
+            
+            foreach ($tpData as $index => $data) {
+                try {
+                    // Log data yang akan diproses
+                    \Log::info('Processing TP data: ', $data);
+                    
+                    // Validasi apakah guru memiliki akses ke capaian pembelajaran
+                    $cp = CapaianPembelajaran::whereHas('mataPelajaran', function($q) use ($guru) {
+                        $q->where('guru_id', $guru->id);
+                    })->find($data['cp_id']);
+                    
+                    if (!$cp) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'kode_tp' => $data['kode_tp'] ?? 'Unknown',
+                            'error' => "Capaian pembelajaran tidak ditemukan"
+                        ];
+                        continue;
+                    }
+                    
+                    // Validasi kode TP unik per CP dan sekolah
+                    $existingTP = TujuanPembelajaran::where('kode_tp', $data['kode_tp'])
+                        ->where('cp_id', $data['cp_id'])
+                        ->where('sekolah_id', $guru->sekolah_id)
+                        ->exists();
+                        
+                    if ($existingTP) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'kode_tp' => $data['kode_tp'] ?? 'Unknown',
+                            'error' => "Kode TP sudah digunakan untuk capaian pembelajaran ini"
+                        ];
+                        continue;
+                    }
+                    
+                    // Buat UUID untuk tujuan pembelajaran
+                    $tpId = (string) Str::uuid();
+                    
+                    // Buat data tujuan pembelajaran
+                    $insertData = [
+                        'id' => $tpId,
+                        'kode_tp' => $data['kode_tp'],
+                        'deskripsi' => $data['deskripsi'],
+                        'bobot' => $data['bobot'],
+                        'cp_id' => $data['cp_id'],
+                        'sekolah_id' => $guru->sekolah_id,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ];
+                    
+                    DB::table('tujuan_pembelajaran')->insert($insertData);
+                    
+                    \Log::info('Tujuan pembelajaran created with ID: ' . $tpId);
+                    
+                    $importedData[] = [
+                        'id' => $tpId,
+                        'kode_tp' => $data['kode_tp'],
+                        'deskripsi' => $data['deskripsi'],
+                        'bobot' => $data['bobot'],
+                        'cp_id' => $data['cp_id']
+                    ];
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    \Log::error('Error creating TP: ' . $e->getMessage());
+                    \Log::error('Stack trace: ' . $e->getTraceAsString());
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'kode_tp' => $data['kode_tp'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data tujuan pembelajaran", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Batch error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
+        }
+    }
+}  

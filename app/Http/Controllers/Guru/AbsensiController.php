@@ -22,8 +22,10 @@ class AbsensiController extends BaseGuruController
             $guru = Auth::user()->guru;
             
             $query = AbsensiSiswa::with(['siswa.kelas', 'pertemuan.mataPelajaran'])
-                ->whereHas('pertemuan.mataPelajaran', function($q) use ($guru) {
-                    $q->where('guru_id', $guru->id);
+                ->whereHas('pertemuan', function($q) use ($guru) {
+                    $q->whereHas('mataPelajaran', function($q2) use ($guru) {
+                        $q2->where('guru_id', $guru->id);
+                    });
                 });
             
             // Filter berdasarkan kelas
@@ -44,19 +46,27 @@ class AbsensiController extends BaseGuruController
             
             // Transformasi data untuk frontend
             $transformedAbsensi = $absensi->map(function($item) {
-                $status = 'hadir';
-                if ($item->izin == 1) $status = 'izin';
-                if ($item->sakit == 1) $status = 'sakit';
-                if ($item->absen == 1) $status = 'absen';
-                
-                $item->status = $status;
-                return $item;
+                return [
+                    'id' => $item->id,
+                    'siswa' => $item->siswa,
+                    'pertemuan' => $item->pertemuan,
+                    'status' => $this->getStatusAbsensi($item),
+                    'created_at' => $item->created_at
+                ];
             });
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data absensi", $transformedAbsensi);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
+    }
+
+    private function getStatusAbsensi($absensi)
+    {
+        if ($absensi->hadir == 1) return 'hadir';
+        if ($absensi->izin == 1) return 'izin';
+        if ($absensi->sakit == 1) return 'sakit';
+        return 'absen';
     }
 
     public function store(Request $request)

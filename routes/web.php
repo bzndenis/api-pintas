@@ -1056,30 +1056,19 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->get('/{id}', 'Guru\CapaianPembelajaranController@show');
             $router->put('/{id}', 'Guru\CapaianPembelajaranController@update');
             $router->delete('/{id}', 'Guru\CapaianPembelajaranController@destroy');
+            $router->post('/batch', 'Guru\CapaianPembelajaranController@storeBatch');
         });
         
         // Tujuan Pembelajaran
-        $router->group(['prefix' => 'tujuan-pembelajaran'], function () use ($router) {
+        $router->group(['prefix' => 'tp'], function () use ($router) {
             $router->get('/', 'Guru\TujuanPembelajaranController@index');
             $router->post('/', 'Guru\TujuanPembelajaranController@store');
             $router->get('/{id}', 'Guru\TujuanPembelajaranController@show');
             $router->put('/{id}', 'Guru\TujuanPembelajaranController@update');
             $router->delete('/{id}', 'Guru\TujuanPembelajaranController@destroy');
+            $router->post('/batch', 'Guru\TujuanPembelajaranController@storeBatch');
         });
-        
-        // Penilaian Siswa
-        $router->group(['prefix' => 'nilai'], function () use ($router) {
-            $router->get('/', 'Guru\NilaiController@index');
-            $router->post('/', 'Guru\NilaiController@store');
-            $router->post('/batch', 'Guru\NilaiController@storeBatch');
-            $router->get('/template', 'Guru\NilaiController@getTemplate');
-            $router->post('/import', 'Guru\NilaiController@import');
-            $router->get('/rekap', 'Guru\RekapController@nilai');
-            $router->get('/export', 'Guru\NilaiController@export');
-            $router->get('/{id}', 'Guru\NilaiController@show');
-            $router->put('/{id}', 'Guru\NilaiController@update');
-        });
-        
+
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
             // Rute statis dulu
@@ -1095,6 +1084,20 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->get('/{id}', 'Guru\AbsensiController@show');
             $router->put('/{id}', 'Guru\AbsensiController@update');
         });
+        
+        // Penilaian Siswa
+        $router->group(['prefix' => 'nilai'], function () use ($router) {
+            $router->get('/', 'Guru\NilaiController@index');
+            $router->post('/', 'Guru\NilaiController@store');
+            $router->post('/batch', 'Guru\NilaiController@storeBatch');
+            $router->get('/template', 'Guru\NilaiController@getTemplate');
+            $router->post('/import', 'Guru\NilaiController@import');
+            $router->get('/rekap', 'Guru\RekapController@nilai');
+            $router->get('/export', 'Guru\NilaiController@export');
+            $router->get('/{id}', 'Guru\NilaiController@show');
+            $router->put('/{id}', 'Guru\NilaiController@update');
+        });        
+        
     });
 
     // User Activity Routes
