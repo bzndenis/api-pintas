@@ -1028,6 +1028,9 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/kelas/{id}/detail', 'Admin\KelasController@detail');
         $router->post('/kelas/{id}/assign-guru', 'Admin\KelasController@assignGuru');
         $router->post('/kelas/{id}/assign-siswa', 'Admin\KelasController@assignSiswa');
+        $router->get('/kelas/template', 'Admin\KelasController@getTemplate');
+        $router->get('/kelas/export', 'Admin\KelasController@export');
+        $router->post('/kelas/import', 'Admin\KelasController@import');
         
         // Laporan
         $router->get('/reports/nilai', 'Admin\ReportController@nilai');
@@ -1037,6 +1040,8 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 
         // Tambahkan route ini di dalam grup admin
         $router->get('/storage/link', 'Admin\StorageController@createStorageLink');
+
+
     });
 
     // Guru Routes
@@ -1071,7 +1076,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
-            // Rute statis dulu
+            $router->get('/months', 'Guru\AbsensiController@getMonths');
             $router->get('/', 'Guru\AbsensiController@index');
             $router->post('/', 'Guru\AbsensiController@store');
             $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
@@ -1079,8 +1084,9 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->get('/export', 'Guru\AbsensiController@export');
             $router->get('/siswa-for-absensi', 'Guru\AbsensiController@getSiswaForAbsensi');
             $router->post('/bulanan', 'Guru\AbsensiController@storeBulanan');
+            $router->post('/pertemuan', 'Guru\AbsensiController@storePertemuan');
+            $router->post('/kehadiran', 'Guru\AbsensiController@storeAbsensi');
             
-            // Rute dengan parameter di akhir
             $router->get('/{id}', 'Guru\AbsensiController@show');
             $router->put('/{id}', 'Guru\AbsensiController@update');
         });

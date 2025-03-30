@@ -29,6 +29,7 @@ CREATE TABLE `absensi_siswa`  (
   `izin` tinyint NOT NULL DEFAULT 0 CHECK (izin >= 0),
   `sakit` tinyint NOT NULL DEFAULT 0 CHECK (sakit >= 0),
   `absen` tinyint NOT NULL DEFAULT 0 CHECK (absen >= 0),
+  `keterangan` varchar(255) DEFAULT NULL,
   `created_by` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
   `sekolah_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -39,6 +40,7 @@ CREATE TABLE `absensi_siswa`  (
   INDEX `created_by`(`created_by` ASC) USING BTREE,
   INDEX `sekolah_id`(`sekolah_id` ASC) USING BTREE,
   INDEX `idx_absensi_siswa_pertemuan`(`siswa_id` ASC, `pertemuan_id` ASC) USING BTREE,
+  INDEX `idx_absensi_rekap` (`siswa_id`, `created_at`),
   CONSTRAINT `absensi_siswa_ibfk_1` FOREIGN KEY (`siswa_id`) REFERENCES `siswa` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `absensi_siswa_ibfk_2` FOREIGN KEY (`pertemuan_id`) REFERENCES `pertemuan_bulanan` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `absensi_siswa_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
@@ -375,5 +377,35 @@ CREATE TABLE `users`  (
   INDEX `sekolah_id`(`sekolah_id` ASC) USING BTREE,
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`sekolah_id`) REFERENCES `sekolah` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE = InnoDB CHARACTER SET = latin1 COLLATE = latin1_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for pertemuan
+-- ----------------------------
+DROP TABLE IF EXISTS `pertemuan`;
+CREATE TABLE `pertemuan` (
+  `id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `kelas_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `mata_pelajaran_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `guru_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `tanggal` date NOT NULL,
+  `pertemuan_ke` int NOT NULL,
+  `materi` varchar(255) NOT NULL,
+  `sekolah_id` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `created_by` char(36) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `kelas_id` (`kelas_id`),
+  KEY `mata_pelajaran_id` (`mata_pelajaran_id`),
+  KEY `guru_id` (`guru_id`),
+  KEY `sekolah_id` (`sekolah_id`),
+  KEY `created_by` (`created_by`),
+  KEY `idx_pertemuan_tanggal` (`tanggal`),
+  CONSTRAINT `pertemuan_ibfk_1` FOREIGN KEY (`kelas_id`) REFERENCES `kelas` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pertemuan_ibfk_2` FOREIGN KEY (`mata_pelajaran_id`) REFERENCES `mata_pelajaran` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pertemuan_ibfk_3` FOREIGN KEY (`guru_id`) REFERENCES `guru` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pertemuan_ibfk_4` FOREIGN KEY (`sekolah_id`) REFERENCES `sekolah` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pertemuan_ibfk_5` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

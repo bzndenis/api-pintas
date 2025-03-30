@@ -21,12 +21,42 @@ class AbsensiController extends BaseGuruController
         try {
             $guru = Auth::user()->guru;
             
-            $query = AbsensiSiswa::with(['siswa.kelas', 'pertemuan.mataPelajaran'])
+            // Dapatkan total pertemuan untuk bulan yang dipilih
+            $totalPertemuan = Pertemuan::whereHas('mataPelajaran', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                });
+            
+            if ($request->month) {
+                $date = Carbon::parse($request->month . '-01');
+                $totalPertemuan->whereMonth('tanggal', $date->month)
+                              ->whereYear('tanggal', $date->year);
+            }
+            
+            $totalPertemuan = $totalPertemuan->count();
+
+            // Query untuk mendapatkan rekap absensi per siswa
+            $query = AbsensiSiswa::with(['siswa'])
+                ->select(
+                    'siswa_id',
+                    DB::raw('SUM(hadir) as total_hadir'),
+                    DB::raw('SUM(izin) as total_izin'),
+                    DB::raw('SUM(sakit) as total_sakit'),
+                    DB::raw('SUM(absen) as total_alpha')
+                )
                 ->whereHas('pertemuan', function($q) use ($guru) {
                     $q->whereHas('mataPelajaran', function($q2) use ($guru) {
                         $q2->where('guru_id', $guru->id);
                     });
                 });
+            
+            // Filter berdasarkan bulan
+            if ($request->month) {
+                $date = Carbon::parse($request->month . '-01');
+                $query->whereHas('pertemuan', function($q) use ($date) {
+                    $q->whereMonth('tanggal', $date->month)
+                      ->whereYear('tanggal', $date->year);
+                });
+            }
             
             // Filter berdasarkan kelas
             if ($request->kelas_id) {
@@ -35,27 +65,26 @@ class AbsensiController extends BaseGuruController
                 });
             }
             
-            // Filter berdasarkan tanggal
-            if ($request->tanggal) {
-                $query->whereHas('pertemuan', function($q) use ($request) {
-                    $q->whereDate('tanggal', Carbon::parse($request->tanggal));
-                });
-            }
-            
-            $absensi = $query->orderBy('created_at', 'desc')->get();
+            $absensi = $query->groupBy('siswa_id')->get();
             
             // Transformasi data untuk frontend
             $transformedAbsensi = $absensi->map(function($item) {
                 return [
-                    'id' => $item->id,
-                    'siswa' => $item->siswa,
-                    'pertemuan' => $item->pertemuan,
-                    'status' => $this->getStatusAbsensi($item),
-                    'created_at' => $item->created_at
+                    'id' => $item->siswa_id,
+                    'nama' => $item->siswa->nama,
+                    'alpha' => $item->total_alpha,
+                    'izin' => $item->total_izin,
+                    'sakit' => $item->total_sakit
                 ];
             });
             
-            return ResponseBuilder::success(200, "Berhasil mendapatkan data absensi", $transformedAbsensi);
+            $data = [
+                'bulan' => $request->month ? Carbon::parse($request->month)->format('F Y') : null,
+                'total_pertemuan' => $totalPertemuan,
+                'data' => $transformedAbsensi
+            ];
+            
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data absensi", $data);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
@@ -75,11 +104,12 @@ class AbsensiController extends BaseGuruController
             'kelas_id' => 'required|exists:kelas,id',
             'mata_pelajaran_id' => 'required|exists:mata_pelajaran,id',
             'tanggal' => 'required|date',
-            'pertemuan_ke' => 'required|integer',
-            'materi' => 'required|string',
+            'pertemuan_ke' => 'required|integer|min:1',
+            'materi' => 'required|string|max:255',
             'absensi' => 'required|array',
             'absensi.*.siswa_id' => 'required|exists:siswa,id',
-            'absensi.*.status' => 'required|in:hadir,izin,sakit,absen'
+            'absensi.*.status' => 'required|in:hadir,izin,sakit,absen',
+            'absensi.*.keterangan' => 'nullable|string|max:255'
         ]);
 
         try {
@@ -89,50 +119,50 @@ class AbsensiController extends BaseGuruController
             
             // Buat pertemuan baru
             $pertemuan = Pertemuan::create([
+                'id' => Uuid::uuid4()->toString(),
                 'kelas_id' => $request->kelas_id,
                 'mata_pelajaran_id' => $request->mata_pelajaran_id,
                 'guru_id' => $guru->id,
                 'tanggal' => Carbon::parse($request->tanggal),
                 'pertemuan_ke' => $request->pertemuan_ke,
                 'materi' => $request->materi,
-                'sekolah_id' => $guru->sekolah_id
+                'sekolah_id' => $guru->sekolah_id,
+                'created_by' => Auth::user()->id
             ]);
             
             // Simpan absensi siswa
             foreach ($request->absensi as $absen) {
                 // Inisialisasi nilai default
-                $hadir = 0;
-                $izin = 0;
-                $sakit = 0;
-                $absen_val = 0;
+                $data = [
+                    'id' => Uuid::uuid4()->toString(),
+                    'pertemuan_id' => $pertemuan->id,
+                    'siswa_id' => $absen['siswa_id'],
+                    'hadir' => 0,
+                    'izin' => 0,
+                    'sakit' => 0,
+                    'absen' => 0,
+                    'keterangan' => $absen['keterangan'] ?? null,
+                    'created_by' => Auth::user()->id,
+                    'sekolah_id' => $guru->sekolah_id
+                ];
                 
                 // Set nilai berdasarkan status
                 switch ($absen['status']) {
                     case 'hadir':
-                        $hadir = 1;
+                        $data['hadir'] = 1;
                         break;
                     case 'izin':
-                        $izin = 1;
+                        $data['izin'] = 1;
                         break;
                     case 'sakit':
-                        $sakit = 1;
+                        $data['sakit'] = 1;
                         break;
                     case 'absen':
-                        $absen_val = 1;
+                        $data['absen'] = 1;
                         break;
                 }
                 
-                AbsensiSiswa::create([
-                    'pertemuan_id' => $pertemuan->id,
-                    'siswa_id' => $absen['siswa_id'],
-                    'hadir' => $hadir,
-                    'izin' => $izin,
-                    'sakit' => $sakit,
-                    'absen' => $absen_val,
-                    'keterangan' => $absen['keterangan'] ?? null,
-                    'created_by' => Auth::user()->id,
-                    'sekolah_id' => $guru->sekolah_id
-                ]);
+                AbsensiSiswa::create($data);
             }
             
             DB::commit();
@@ -606,6 +636,149 @@ class AbsensiController extends BaseGuruController
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menyimpan rekap absensi: " . $e->getMessage());
+        }
+    }
+
+    public function getMonths(Request $request)
+    {
+        try {
+            $guru = Auth::user()->guru;
+            
+            // Dapatkan tahun dari request, default ke tahun sekarang
+            $year = $request->year ?? date('Y');
+            
+            // Dapatkan daftar bulan yang memiliki data absensi
+            $months = Pertemuan::whereHas('mataPelajaran', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                })
+                ->whereYear('tanggal', $year)
+                ->select(DB::raw('DISTINCT MONTH(tanggal) as month'))
+                ->orderBy('month', 'asc')
+                ->get()
+                ->map(function($item) use ($year) {
+                    $date = Carbon::createFromDate($year, $item->month, 1);
+                    return [
+                        'id' => $item->month,
+                        'name' => $date->format('F Y'),
+                        'value' => $date->format('Y-m')
+                    ];
+                });
+                
+            return ResponseBuilder::success(200, "Berhasil mendapatkan daftar bulan", $months);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
+    // Untuk menyimpan data pertemuan (tahun dan bulan)
+    public function storePertemuan(Request $request)
+    {
+        $this->validate($request, [
+            'kelas_id' => 'required|exists:kelas,id',
+            'mata_pelajaran_id' => 'required|exists:mata_pelajaran,id',
+            'bulan' => 'required|integer|min:1|max:12',
+            'tahun' => 'required|integer|min:2000|max:2100',
+            'total_pertemuan' => 'required|integer|min:1'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            $guru = Auth::user()->guru;
+            
+            // Cek apakah sudah ada pertemuan di bulan tersebut
+            $existingPertemuan = Pertemuan::where('kelas_id', $request->kelas_id)
+                ->where('mata_pelajaran_id', $request->mata_pelajaran_id)
+                ->whereMonth('tanggal', $request->bulan)
+                ->whereYear('tanggal', $request->tahun)
+                ->first();
+                
+            if ($existingPertemuan) {
+                return ResponseBuilder::error(400, "Data pertemuan untuk bulan ini sudah ada");
+            }
+            
+            // Buat pertemuan baru
+            $pertemuan = Pertemuan::create([
+                'id' => Uuid::uuid4()->toString(),
+                'kelas_id' => $request->kelas_id,
+                'mata_pelajaran_id' => $request->mata_pelajaran_id,
+                'guru_id' => $guru->id,
+                'tanggal' => Carbon::createFromDate($request->tahun, $request->bulan, 1),
+                'total_pertemuan' => $request->total_pertemuan,
+                'sekolah_id' => $guru->sekolah_id,
+                'created_by' => Auth::user()->id
+            ]);
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(201, "Berhasil menyimpan data pertemuan", $pertemuan);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menyimpan data pertemuan: " . $e->getMessage());
+        }
+    }
+
+    // Untuk menyimpan/mengupdate data absensi siswa
+    public function storeAbsensi(Request $request)
+    {
+        $this->validate($request, [
+            'siswa_id' => 'required|exists:siswa,id',
+            'pertemuan_id' => 'required|exists:pertemuan,id',
+            'alpha' => 'required|integer|min:0',
+            'izin' => 'required|integer|min:0',
+            'sakit' => 'required|integer|min:0'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            $guru = Auth::user()->guru;
+            
+            // Dapatkan data pertemuan
+            $pertemuan = Pertemuan::where('guru_id', $guru->id)
+                ->findOrFail($request->pertemuan_id);
+                
+            // Validasi total kehadiran
+            $totalKehadiran = $request->alpha + $request->izin + $request->sakit;
+            if ($totalKehadiran > $pertemuan->total_pertemuan) {
+                return ResponseBuilder::error(400, "Total kehadiran tidak boleh melebihi total pertemuan");
+            }
+            
+            // Cek apakah sudah ada data absensi
+            $absensi = AbsensiSiswa::where('siswa_id', $request->siswa_id)
+                ->where('pertemuan_id', $request->pertemuan_id)
+                ->first();
+                
+            if ($absensi) {
+                // Update data yang sudah ada
+                $absensi->update([
+                    'absen' => $request->alpha,
+                    'izin' => $request->izin,
+                    'sakit' => $request->sakit,
+                    'hadir' => $pertemuan->total_pertemuan - $totalKehadiran,
+                    'updated_by' => Auth::user()->id
+                ]);
+            } else {
+                // Buat data absensi baru
+                AbsensiSiswa::create([
+                    'id' => Uuid::uuid4()->toString(),
+                    'siswa_id' => $request->siswa_id,
+                    'pertemuan_id' => $request->pertemuan_id,
+                    'absen' => $request->alpha,
+                    'izin' => $request->izin,
+                    'sakit' => $request->sakit,
+                    'hadir' => $pertemuan->total_pertemuan - $totalKehadiran,
+                    'created_by' => Auth::user()->id,
+                    'sekolah_id' => $guru->sekolah_id
+                ]);
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(201, "Berhasil menyimpan data absensi");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menyimpan data absensi: " . $e->getMessage());
         }
     }
 } 
