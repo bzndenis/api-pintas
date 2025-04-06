@@ -1031,6 +1031,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/kelas/template', 'Admin\KelasController@getTemplate');
         $router->get('/kelas/export', 'Admin\KelasController@export');
         $router->post('/kelas/import', 'Admin\KelasController@import');
+        $router->post('/kelas/batch', 'Admin\KelasController@storeBatch');
         
         // Laporan
         $router->get('/reports/nilai', 'Admin\ReportController@nilai');
@@ -1040,8 +1041,6 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 
         // Tambahkan route ini di dalam grup admin
         $router->get('/storage/link', 'Admin\StorageController@createStorageLink');
-
-
     });
 
     // Guru Routes
@@ -1076,19 +1075,13 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
 
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
-            $router->get('/months', 'Guru\AbsensiController@getMonths');
             $router->get('/', 'Guru\AbsensiController@index');
-            $router->post('/', 'Guru\AbsensiController@store');
-            $router->post('/batch-update', 'Guru\AbsensiController@batchUpdate');
-            $router->get('/rekap-bulanan', 'Guru\AbsensiController@rekapBulanan');
-            $router->get('/export', 'Guru\AbsensiController@export');
-            $router->get('/siswa-for-absensi', 'Guru\AbsensiController@getSiswaForAbsensi');
-            $router->post('/bulanan', 'Guru\AbsensiController@storeBulanan');
-            $router->post('/pertemuan', 'Guru\AbsensiController@storePertemuan');
-            $router->post('/kehadiran', 'Guru\AbsensiController@storeAbsensi');
-            
-            $router->get('/{id}', 'Guru\AbsensiController@show');
-            $router->put('/{id}', 'Guru\AbsensiController@update');
+            $router->post('/bulan', 'Guru\AbsensiController@createMonth');
+            $router->get('/bulan/{id}', 'Guru\AbsensiController@getMonthDetail');
+            $router->get('/bulan/{id}/siswa', 'Guru\AbsensiController@getStudentsByMonth');
+            $router->post('/siswa', 'Guru\AbsensiController@saveStudentAttendance');
+            $router->put('/siswa/{id}', 'Guru\AbsensiController@updateStudentAttendance');
+            $router->get('/rekap', 'Guru\AbsensiController@summary');
         });
         
         // Penilaian Siswa

@@ -57,6 +57,14 @@ class AbsensiSiswa extends Model
         return $this->belongsTo(PertemuanBulanan::class, 'pertemuan_id');
     }
     
+    /**
+     * Relasi ke model Pertemuan (harian)
+     */
+    public function pertemuanHarian()
+    {
+        return $this->belongsTo(Pertemuan::class, 'pertemuan_id');
+    }
+    
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');

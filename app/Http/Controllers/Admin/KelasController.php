@@ -472,4 +472,103 @@ class KelasController extends BaseAdminController
             return ResponseBuilder::error(500, "Gagal mengimport data: " . $e->getMessage());
         }
     }
+
+    public function storeBatch(Request $request)
+    {
+        $this->validate($request, [
+            'kelas' => 'required|array|min:1',
+            'kelas.*.nama_kelas' => 'required|string|max:255',
+            'kelas.*.tingkat' => 'required|string|max:255',
+            'kelas.*.tahun' => 'required',
+            'kelas.*.guru_id' => 'nullable|string|uuid'
+        ]);
+
+        try {
+            $admin = Auth::user();
+            \Log::info('Admin yang melakukan batch import kelas: ', ['id' => $admin->id, 'sekolah_id' => $admin->sekolah_id]);
+            
+            $kelasData = $request->kelas;
+            $importedData = [];
+            $errors = [];
+            $imported = 0;
+            
+            DB::beginTransaction();
+            
+            foreach ($kelasData as $index => $data) {
+                try {
+                    // Log data yang akan diproses
+                    \Log::info('Processing kelas data: ', $data);
+                    
+                    // Validasi guru_id jika ada
+                    if (!empty($data['guru_id'])) {
+                        $guru = Guru::where('id', $data['guru_id'])
+                            ->where('sekolah_id', $admin->sekolah_id)
+                            ->first();
+                        
+                        if (!$guru) {
+                            $errors[] = [
+                                'row' => $index + 1,
+                                'nama_kelas' => $data['nama_kelas'],
+                                'error' => "Guru dengan ID {$data['guru_id']} tidak ditemukan"
+                            ];
+                            continue;
+                        }
+                    }
+                    
+                    // Cek apakah kombinasi nama_kelas, tahun, dan sekolah_id sudah ada
+                    $existingKelas = Kelas::where('nama_kelas', $data['nama_kelas'])
+                        ->where('tahun', $data['tahun'])
+                        ->where('sekolah_id', $admin->sekolah_id)
+                        ->first();
+                    
+                    if ($existingKelas) {
+                        // Update kelas yang sudah ada
+                        $existingKelas->update([
+                            'tingkat' => $data['tingkat'],
+                            'guru_id' => $data['guru_id'] ?? null
+                        ]);
+                        
+                        $importedData[] = $existingKelas;
+                        $imported++;
+                        \Log::info('Kelas updated: ', ['id' => $existingKelas->id, 'nama_kelas' => $existingKelas->nama_kelas]);
+                    } else {
+                        // Buat kelas baru
+                        $kelas = Kelas::create([
+                            'nama_kelas' => $data['nama_kelas'],
+                            'tingkat' => $data['tingkat'],
+                            'tahun' => $data['tahun'],
+                            'guru_id' => $data['guru_id'] ?? null,
+                            'sekolah_id' => $admin->sekolah_id
+                        ]);
+                        
+                        $importedData[] = $kelas;
+                        $imported++;
+                        \Log::info('Kelas created: ', ['id' => $kelas->id, 'nama_kelas' => $kelas->nama_kelas]);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error creating kelas: ' . $e->getMessage());
+                    \Log::error('Stack trace: ' . $e->getTraceAsString());
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'nama_kelas' => $data['nama_kelas'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+            
+            DB::commit();
+            
+            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data kelas", [
+                'imported' => $imported,
+                'errors' => $errors,
+                'data' => $importedData
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Batch error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal menambahkan data: " . $e->getMessage());
+        }
+    }
 }
