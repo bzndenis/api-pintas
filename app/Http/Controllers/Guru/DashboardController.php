@@ -25,13 +25,33 @@ class DashboardController extends BaseGuruController
             // Get jumlah siswa yang diajar
             $jumlahSiswa = Siswa::whereHas('kelas', function($q) use ($guru) {
                 $q->whereHas('mataPelajaran', function($q) use ($guru) {
-                    $q->where('guru_id', $guru->id);
+                    $q->where('mata_pelajaran.guru_id', $guru->id);
                 });
             })->count();
+
+            // Get info sekolah
+            $sekolah = $guru->sekolah;
+
+            // Get daftar kelas yang diajar
+            $kelas = Kelas::whereHas('mataPelajaran', function($q) use ($guru) {
+                $q->where('mata_pelajaran.guru_id', $guru->id);
+            })->get();
             
             $data = [
                 'guru' => $guru,
+                'sekolah' => [
+                    'id' => $sekolah->id,
+                    'nama' => $sekolah->nama,
+                    'alamat' => $sekolah->alamat
+                ],
                 'mengajar' => $mengajar,
+                'kelas' => $kelas->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'nama_kelas' => $item->nama_kelas,
+                        'tingkat' => $item->tingkat
+                    ];
+                }),
                 'jumlah_siswa' => $jumlahSiswa,
             ];
             

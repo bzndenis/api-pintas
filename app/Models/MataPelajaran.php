@@ -64,4 +64,9 @@ class MataPelajaran extends Model
     {
         return $this->hasMany(PertemuanBulanan::class, 'mata_pelajaran_id');
     }
+
+    public function kelas()
+    {
+        return $this->belongsToMany(Kelas::class, 'pertemuan', 'mata_pelajaran_id', 'kelas_id');
+    }
 } 
