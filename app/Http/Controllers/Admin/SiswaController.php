@@ -305,14 +305,14 @@ class SiswaController extends BaseAdminController
             $sheet = $spreadsheet->getActiveSheet();
             
             // Set header dengan penjelasan yang jelas
-            $sheet->setCellValue('A1', 'nama');
-            $sheet->setCellValue('B1', 'nisn');
+            $sheet->setCellValue('A1', 'nisn');
+            $sheet->setCellValue('B1', 'nama');
             $sheet->setCellValue('C1', 'jenis_kelamin');
             $sheet->setCellValue('D1', 'kelas_id');
             
             // Contoh data
-            $sheet->setCellValue('A2', 'Contoh: Budi Santoso');
-            $sheet->setCellValue('B2', 'Contoh: 9876543210');
+            $sheet->setCellValue('A2', 'Contoh: 1234567890');
+            $sheet->setCellValue('B2', 'Contoh: Budi Santoso');
             $sheet->setCellValue('C2', 'Contoh: L');
             $sheet->setCellValue('D2', 'Contoh: (Isi dengan ID kelas yang valid)');
             

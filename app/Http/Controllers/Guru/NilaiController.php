@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Uuid;
 use App\Models\CapaianPembelajaran;
 use App\Models\Kelas;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class NilaiController extends BaseGuruController
 {
@@ -69,10 +73,11 @@ class NilaiController extends BaseGuruController
             }
 
             $nilai = NilaiSiswa::create([
+                'id' => Uuid::uuid4()->toString(),
                 'siswa_id' => $request->siswa_id,
                 'tp_id' => $request->tp_id,
                 'nilai' => $request->nilai,
-                'created_by' => $guru->user_id,
+                'created_by' => Auth::id(),
                 'sekolah_id' => $guru->sekolah_id
             ]);
 
@@ -121,8 +126,7 @@ class NilaiController extends BaseGuruController
             
             // Validasi input
             $this->validate($request, [
-                'nilai' => 'required|numeric|min:0|max:100',
-                'keterangan' => 'nullable|string'
+                'nilai' => 'required|numeric|min:0|max:100'
             ]);
 
             $guru = Auth::user()->guru;
@@ -136,7 +140,9 @@ class NilaiController extends BaseGuruController
                 return ResponseBuilder::error(404, "Data nilai tidak ditemukan");
             }
             
-            $nilai->update($request->only(['nilai', 'keterangan']));
+            $nilai->update([
+                'nilai' => $request->nilai
+            ]);
             
             return ResponseBuilder::success(200, "Berhasil mengupdate nilai", ['nilai' => $nilai]);
         } catch (\Exception $e) {
@@ -155,12 +161,8 @@ class NilaiController extends BaseGuruController
         $this->validate($request, [
             'nilai_batch' => 'required|array|min:1',
             'nilai_batch.*.siswa_id' => 'required|exists:siswa,id',
-            'nilai_batch.*.tujuan_pembelajaran_id' => 'required|exists:tujuan_pembelajaran,id',
-            'nilai_batch.*.nilai' => 'required|numeric|min:0|max:100',
-            'nilai_batch.*.semester' => 'required|in:1,2',
-            'nilai_batch.*.jenis_nilai' => 'required|in:UH,STS,SAS',
-            'nilai_batch.*.nomor_uh' => 'required_if:nilai_batch.*.jenis_nilai,UH|nullable|integer|min:1|max:3',
-            'nilai_batch.*.keterangan' => 'nullable|string'
+            'nilai_batch.*.tp_id' => 'required|exists:tujuan_pembelajaran,id',
+            'nilai_batch.*.nilai' => 'required|numeric|min:0|max:100'
         ]);
 
         try {
@@ -175,7 +177,7 @@ class NilaiController extends BaseGuruController
                 try {
                     // Validasi apakah guru mengajar mata pelajaran tersebut
                     $tp = TujuanPembelajaran::with('capaianPembelajaran.mataPelajaran')
-                        ->find($nilaiData['tujuan_pembelajaran_id']);
+                        ->find($nilaiData['tp_id']);
                         
                     if (!$tp || $tp->capaianPembelajaran->mataPelajaran->guru_id !== $guru->id) {
                         $errors[] = [
@@ -185,36 +187,13 @@ class NilaiController extends BaseGuruController
                         continue;
                     }
 
-                    // Validasi jumlah UH per bab
-                    if ($nilaiData['jenis_nilai'] === 'UH') {
-                        $existingUH = NilaiSiswa::where('siswa_id', $nilaiData['siswa_id'])
-                            ->where('semester', $nilaiData['semester'])
-                            ->where('jenis_nilai', 'UH')
-                            ->where('nomor_uh', $nilaiData['nomor_uh'])
-                            ->whereHas('tujuanPembelajaran', function($q) use ($tp) {
-                                $q->where('capaian_pembelajaran_id', $tp->capaian_pembelajaran_id);
-                            })
-                            ->exists();
-
-                        if ($existingUH) {
-                            $errors[] = [
-                                'index' => $index,
-                                'message' => "Nilai UH {$nilaiData['nomor_uh']} untuk siswa ini sudah ada pada data ke-" . ($index + 1)
-                            ];
-                            continue;
-                        }
-                    }
-                    
                     // Buat nilai baru
                     $nilai = NilaiSiswa::create([
+                        'id' => Uuid::uuid4()->toString(),
                         'siswa_id' => $nilaiData['siswa_id'],
-                        'tujuan_pembelajaran_id' => $nilaiData['tujuan_pembelajaran_id'],
+                        'tp_id' => $nilaiData['tp_id'],
                         'nilai' => $nilaiData['nilai'],
-                        'semester' => $nilaiData['semester'],
-                        'jenis_nilai' => $nilaiData['jenis_nilai'],
-                        'nomor_uh' => $nilaiData['nomor_uh'] ?? null,
-                        'keterangan' => $nilaiData['keterangan'] ?? null,
-                        'guru_id' => $guru->id,
+                        'created_by' => Auth::id(),
                         'sekolah_id' => $guru->sekolah_id
                     ]);
                     
@@ -275,8 +254,7 @@ class NilaiController extends BaseGuruController
             
             // Dapatkan semua siswa di kelas
             $siswa = Siswa::where('kelas_id', $request->kelas_id)
-                ->where('sekolah_id', Auth::user()->sekolah_id)
-                ->where('is_active', 1)
+                ->where('sekolah_id', $guru->sekolah_id)
                 ->orderBy('nama', 'asc')
                 ->get(['id', 'nama', 'nisn']);
                 
@@ -286,47 +264,88 @@ class NilaiController extends BaseGuruController
             
             // Dapatkan semua tujuan pembelajaran dari CP ini
             $tujuanPembelajaran = TujuanPembelajaran::where('cp_id', $request->capaian_pembelajaran_id)
-                ->where('sekolah_id', Auth::user()->sekolah_id)
+                ->where('sekolah_id', $guru->sekolah_id)
                 ->get(['id', 'kode_tp', 'deskripsi']);
                 
             if ($tujuanPembelajaran->isEmpty()) {
                 return ResponseBuilder::error(404, "Tidak ada tujuan pembelajaran untuk capaian pembelajaran ini");
             }
+
+            // Buat spreadsheet baru
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
             
-            // Buat template data
-            $templateData = [];
+            // Set judul sheet
+            $sheet->setTitle('Template Nilai');
+            
+            // Header informasi
+            $sheet->setCellValue('A1', 'TEMPLATE INPUT NILAI SISWA');
+            $sheet->setCellValue('A2', 'Kelas: ' . Kelas::find($request->kelas_id)->nama_kelas);
+            $sheet->setCellValue('A3', 'Mata Pelajaran: ' . $cp->mataPelajaran->nama);
+            $sheet->setCellValue('A4', 'Capaian Pembelajaran: ' . $cp->deskripsi);
+            
+            // Merge cells untuk header informasi
+            $sheet->mergeCells('A1:E1');
+            $sheet->mergeCells('A2:E2');
+            $sheet->mergeCells('A3:E3');
+            $sheet->mergeCells('A4:E4');
+            
+            // Header tabel
+            $sheet->setCellValue('A6', 'NISN');
+            $sheet->setCellValue('B6', 'Nama Siswa');
+            $sheet->setCellValue('C6', 'ID Siswa');
+            $sheet->setCellValue('D6', 'ID TP');
+            $sheet->setCellValue('E6', 'Nilai');
+            
+            // Style untuk header
+            $headerStyle = [
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E0E0E0']
+                ],
+                'alignment' => [
+                    'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER
+                ]
+            ];
+            $sheet->getStyle('A1:E6')->applyFromArray($headerStyle);
+            
+            // Isi data
+            $row = 7;
             foreach ($siswa as $s) {
                 foreach ($tujuanPembelajaran as $tp) {
-                    // Cek apakah nilai sudah ada
-                    $existingNilai = NilaiSiswa::where('siswa_id', $s->id)
-                        ->where('tp_id', $tp->id)
-                        ->where('sekolah_id', Auth::user()->sekolah_id)
-                        ->first();
-                    
-                    $templateData[] = [
-                        'siswa_id' => $s->id,
-                        'nama_siswa' => $s->nama,
-                        'nisn' => $s->nisn,
-                        'tp_id' => $tp->id,
-                        'kode_tp' => $tp->kode_tp,
-                        'deskripsi_tp' => $tp->deskripsi,
-                        'nilai' => $existingNilai ? $existingNilai->nilai : null
-                    ];
+                    $sheet->setCellValue('A' . $row, $s->nisn);
+                    $sheet->setCellValue('B' . $row, $s->nama);
+                    $sheet->setCellValue('C' . $row, $s->id);
+                    $sheet->setCellValue('D' . $row, $tp->id);
+                    $row++;
                 }
             }
             
-            // Informasi tambahan untuk template
-            $templateInfo = [
-                'kelas' => Kelas::find($request->kelas_id)->nama_kelas,
-                'capaian_pembelajaran' => $cp->deskripsi,
-                'mata_pelajaran' => $cp->mataPelajaran->nama_mapel,
-                'jumlah_siswa' => $siswa->count(),
-                'jumlah_tp' => $tujuanPembelajaran->count()
-            ];
+            // Tambahkan catatan
+            $row += 2;
+            $sheet->setCellValue('A' . $row, 'Catatan:');
+            $row++;
+            $sheet->setCellValue('A' . $row, '1. Jangan mengubah ID Siswa dan ID TP');
+            $row++;
+            $sheet->setCellValue('A' . $row, '2. Nilai harus diisi dengan angka 0-100');
+            $row++;
+            $sheet->setCellValue('A' . $row, '3. File yang diunggah harus dalam format Excel (.xlsx atau .xls)');
             
-            return ResponseBuilder::success(200, "Berhasil membuat template nilai", [
-                'template_info' => $templateInfo,
-                'template_data' => $templateData
+            // Auto-size kolom
+            foreach (range('A', 'E') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            // Buat file Excel
+            $filename = 'Template_Nilai_' . Kelas::find($request->kelas_id)->nama_kelas . '_' . date('Ymd_His') . '.xlsx';
+            
+            // Kembalikan file sebagai stream
+            return response()->streamDownload(function() use ($spreadsheet) {
+                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal membuat template: " . $e->getMessage());
