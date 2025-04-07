@@ -72,4 +72,27 @@ class Kelas extends Model
     {
         return $this->belongsTo(TahunAjaran::class, 'tahun_ajaran_id');
     }
+
+    /**
+     * Relasi ke model Pertemuan
+     */
+    public function pertemuan()
+    {
+        return $this->hasMany(Pertemuan::class);
+    }
+
+    /**
+     * Relasi ke model MataPelajaran melalui tabel pertemuan
+     */
+    public function mataPelajaran()
+    {
+        return $this->hasManyThrough(
+            MataPelajaran::class,
+            Pertemuan::class,
+            'kelas_id',
+            'id',
+            'id',
+            'mata_pelajaran_id'
+        );
+    }
 } 

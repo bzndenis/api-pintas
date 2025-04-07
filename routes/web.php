@@ -82,174 +82,28 @@ function getEndpointUsageInfo($method, $uri, $baseUrl) {
         $headers[] = ['name' => 'Authorization', 'value' => 'Bearer {your_token}'];
     }
     
-    $bodyParams = [];
-    if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
-        // Tambahkan contoh body parameter berdasarkan URI
-        if (strpos($uri, 'auth/login') !== false) {
-            $bodyParams = [
-                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email pengguna'],
-                ['name' => 'password', 'type' => 'string', 'required' => true, 'description' => 'Password pengguna']
-            ];
-        } elseif (strpos($uri, 'auth/register') !== false) {
-            $bodyParams = [
-                ['name' => 'nama_lengkap', 'type' => 'string', 'required' => true, 'description' => 'Nama lengkap'],
-                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email pengguna'],
-                ['name' => 'password', 'type' => 'string', 'required' => true, 'description' => 'Password (min. 8 karakter)'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'user/change-password') !== false) {
-            $bodyParams = [
-                ['name' => 'current_password', 'type' => 'string', 'required' => true, 'description' => 'Password saat ini'],
-                ['name' => 'new_password', 'type' => 'string', 'required' => true, 'description' => 'Password baru'],
-                ['name' => 'new_password_confirmation', 'type' => 'string', 'required' => true, 'description' => 'Konfirmasi password baru']
-            ];
-        } elseif (strpos($uri, 'guru') !== false) {
-            $bodyParams = [
-                ['name' => 'nama', 'type' => 'string', 'required' => true, 'description' => 'Nama guru'],
-                ['name' => 'nip', 'type' => 'string', 'required' => false, 'description' => 'NIP guru'],
-                ['name' => 'email', 'type' => 'string', 'required' => true, 'description' => 'Email guru'],
-                ['name' => 'no_telp', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon guru'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'siswa') !== false) {
-            $bodyParams = [
-                ['name' => 'nama', 'type' => 'string', 'required' => true, 'description' => 'Nama siswa'],
-                ['name' => 'nis', 'type' => 'string', 'required' => true, 'description' => 'NIS siswa'],
-                ['name' => 'nisn', 'type' => 'string', 'required' => false, 'description' => 'NISN siswa'],
-                ['name' => 'jenis_kelamin', 'type' => 'enum', 'required' => true, 'description' => 'Jenis kelamin (L/P)'],
-                ['name' => 'tempat_lahir', 'type' => 'string', 'required' => true, 'description' => 'Tempat lahir'],
-                ['name' => 'tanggal_lahir', 'type' => 'date', 'required' => true, 'description' => 'Tanggal lahir (YYYY-MM-DD)'],
-                ['name' => 'alamat', 'type' => 'string', 'required' => false, 'description' => 'Alamat siswa'],
-                ['name' => 'nama_ortu', 'type' => 'string', 'required' => false, 'description' => 'Nama orang tua'],
-                ['name' => 'no_telp_ortu', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon orang tua'],
-                ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID kelas'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'mapel') !== false) {
-            $bodyParams = [
-                ['name' => 'kode_mapel', 'type' => 'string', 'required' => true, 'description' => 'Kode mata pelajaran'],
-                ['name' => 'nama_mapel', 'type' => 'string', 'required' => true, 'description' => 'Nama mata pelajaran'],
-                ['name' => 'tingkat', 'type' => 'string', 'required' => true, 'description' => 'Tingkat kelas (1-12)'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'cp') !== false) {
-            $bodyParams = [
-                ['name' => 'kode_cp', 'type' => 'string', 'required' => true, 'description' => 'Kode capaian pembelajaran'],
-                ['name' => 'deskripsi', 'type' => 'string', 'required' => true, 'description' => 'Deskripsi capaian pembelajaran'],
-                ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID mata pelajaran'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'tp') !== false) {
-            $bodyParams = [
-                ['name' => 'kode_tp', 'type' => 'string', 'required' => true, 'description' => 'Kode tujuan pembelajaran'],
-                ['name' => 'deskripsi', 'type' => 'string', 'required' => true, 'description' => 'Deskripsi tujuan pembelajaran'],
-                ['name' => 'bobot', 'type' => 'decimal', 'required' => true, 'description' => 'Bobot nilai (0-100)'],
-                ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID capaian pembelajaran'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'nilai') !== false) {
-            $bodyParams = [
-                ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID siswa'],
-                ['name' => 'tp_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID tujuan pembelajaran'],
-                ['name' => 'nilai', 'type' => 'decimal', 'required' => true, 'description' => 'Nilai (0-100)'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'pertemuan') !== false) {
-            $bodyParams = [
-                ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID kelas'],
-                ['name' => 'bulan', 'type' => 'integer', 'required' => true, 'description' => 'Bulan (1-12)'],
-                ['name' => 'tahun', 'type' => 'integer', 'required' => true, 'description' => 'Tahun (YYYY)'],
-                ['name' => 'total_pertemuan', 'type' => 'integer', 'required' => true, 'description' => 'Total pertemuan dalam bulan'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'absensi') !== false) {
-            $bodyParams = [
-                ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID siswa'],
-                ['name' => 'pertemuan_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID pertemuan bulanan'],
-                ['name' => 'hadir', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah kehadiran'],
-                ['name' => 'izin', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah izin'],
-                ['name' => 'sakit', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah sakit'],
-                ['name' => 'absen', 'type' => 'integer', 'required' => true, 'description' => 'Jumlah absen tanpa keterangan'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'tahun-ajaran') !== false) {
-            $bodyParams = [
-                ['name' => 'nama_tahun_ajaran', 'type' => 'string', 'required' => true, 'description' => 'Nama tahun ajaran (contoh: 2023/2024)'],
-                ['name' => 'tanggal_mulai', 'type' => 'date', 'required' => true, 'description' => 'Tanggal mulai (YYYY-MM-DD)'],
-                ['name' => 'tanggal_selesai', 'type' => 'date', 'required' => true, 'description' => 'Tanggal selesai (YYYY-MM-DD)'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah'],
-                ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Status aktif (true/false)']
-            ];
-        } elseif (strpos($uri, 'kelas') !== false) {
-            $bodyParams = [
-                ['name' => 'nama_kelas', 'type' => 'string', 'required' => true, 'description' => 'Nama kelas'],
-                ['name' => 'tingkat', 'type' => 'string', 'required' => true, 'description' => 'Tingkat kelas (1-12)'],
-                ['name' => 'tahun_ajaran_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID tahun ajaran'],
-                ['name' => 'guru_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'UUID guru wali kelas'],
-                ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => true, 'description' => 'UUID sekolah']
-            ];
-        } elseif (strpos($uri, 'sekolah') !== false) {
-            $bodyParams = [
-                ['name' => 'nama_sekolah', 'type' => 'string', 'required' => true, 'description' => 'Nama sekolah'],
-                ['name' => 'npsn', 'type' => 'string', 'required' => true, 'description' => 'Nomor Pokok Sekolah Nasional'],
-                ['name' => 'alamat', 'type' => 'string', 'required' => true, 'description' => 'Alamat sekolah'],
-                ['name' => 'kota', 'type' => 'string', 'required' => true, 'description' => 'Kota'],
-                ['name' => 'provinsi', 'type' => 'string', 'required' => true, 'description' => 'Provinsi'],
-                ['name' => 'kode_pos', 'type' => 'string', 'required' => false, 'description' => 'Kode pos'],
-                ['name' => 'no_telp', 'type' => 'string', 'required' => false, 'description' => 'Nomor telepon'],
-                ['name' => 'email', 'type' => 'string', 'required' => false, 'description' => 'Email sekolah'],
-                ['name' => 'website', 'type' => 'string', 'required' => false, 'description' => 'Website sekolah'],
-                ['name' => 'kepala_sekolah', 'type' => 'string', 'required' => false, 'description' => 'Nama kepala sekolah'],
-                ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Status aktif (true/false)']
-            ];
-        }
+    // Ambil parameter query dari controller
+    $queryParams = [];
+    $controllerAction = getControllerFromUri($uri);
+    if ($controllerAction) {
+        $queryParams = getQueryParamsFromController($controllerAction);
     }
     
-    $queryParams = [];
-    if ($method === 'GET') {
+    // Tambahkan parameter umum untuk semua endpoint GET
+    if ($method === 'GET' && empty($queryParams)) {
         $queryParams = [
             ['name' => 'page', 'type' => 'integer', 'required' => false, 'description' => 'Nomor halaman untuk pagination'],
-            ['name' => 'per_page', 'type' => 'integer', 'required' => false, 'description' => 'Jumlah item per halaman']
+            ['name' => 'per_page', 'type' => 'integer', 'required' => false, 'description' => 'Jumlah item per halaman'],
+            ['name' => 'search', 'type' => 'string', 'required' => false, 'description' => 'Pencarian global'],
+            ['name' => 'sort_by', 'type' => 'string', 'required' => false, 'description' => 'Kolom untuk pengurutan'],
+            ['name' => 'sort_dir', 'type' => 'string', 'required' => false, 'description' => 'Arah pengurutan (asc/desc)']
         ];
-        
-        // Tambahkan filter khusus berdasarkan URI
-        if (strpos($uri, 'siswa') !== false) {
-            $queryParams[] = ['name' => 'kelas_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan kelas'];
-            $queryParams[] = ['name' => 'nama', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama siswa'];
-            $queryParams[] = ['name' => 'nis', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan NIS'];
-        } elseif (strpos($uri, 'guru') !== false) {
-            $queryParams[] = ['name' => 'nama', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama guru'];
-            $queryParams[] = ['name' => 'nip', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan NIP'];
-        } elseif (strpos($uri, 'nilai') !== false) {
-            $queryParams[] = ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan siswa'];
-            $queryParams[] = ['name' => 'tp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan tujuan pembelajaran'];
-            $queryParams[] = ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan capaian pembelajaran'];
-            $queryParams[] = ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan mata pelajaran'];
-        } elseif (strpos($uri, 'absensi') !== false) {
-            $queryParams[] = ['name' => 'siswa_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan siswa'];
-            $queryParams[] = ['name' => 'pertemuan_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan pertemuan'];
-            $queryParams[] = ['name' => 'bulan', 'type' => 'integer', 'required' => false, 'description' => 'Filter berdasarkan bulan (1-12)'];
-            $queryParams[] = ['name' => 'tahun', 'type' => 'integer', 'required' => false, 'description' => 'Filter berdasarkan tahun (YYYY)'];
-        } elseif (strpos($uri, 'kelas') !== false) {
-            $queryParams[] = ['name' => 'tahun_ajaran_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan tahun ajaran'];
-            $queryParams[] = ['name' => 'tingkat', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan tingkat kelas'];
-            $queryParams[] = ['name' => 'guru_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan guru wali kelas'];
-        } elseif (strpos($uri, 'mapel') !== false) {
-            $queryParams[] = ['name' => 'tingkat', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan tingkat kelas'];
-            $queryParams[] = ['name' => 'nama_mapel', 'type' => 'string', 'required' => false, 'description' => 'Filter berdasarkan nama mata pelajaran'];
-        } elseif (strpos($uri, 'cp') !== false) {
-            $queryParams[] = ['name' => 'mapel_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan mata pelajaran'];
-        } elseif (strpos($uri, 'tp') !== false) {
-            $queryParams[] = ['name' => 'cp_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan capaian pembelajaran'];
-        } elseif (strpos($uri, 'tahun-ajaran') !== false) {
-            $queryParams[] = ['name' => 'is_active', 'type' => 'boolean', 'required' => false, 'description' => 'Filter berdasarkan status aktif'];
-        }
-        
-        // Tambahkan filter umum untuk semua endpoint
-        $queryParams[] = ['name' => 'sekolah_id', 'type' => 'string (UUID)', 'required' => false, 'description' => 'Filter berdasarkan sekolah'];
-        $queryParams[] = ['name' => 'search', 'type' => 'string', 'required' => false, 'description' => 'Pencarian global'];
-        $queryParams[] = ['name' => 'sort_by', 'type' => 'string', 'required' => false, 'description' => 'Kolom untuk pengurutan'];
-        $queryParams[] = ['name' => 'sort_dir', 'type' => 'string', 'required' => false, 'description' => 'Arah pengurutan (asc/desc)'];
+    }
+    
+    // Ambil parameter body dari controller
+    $bodyParams = [];
+    if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
+        $bodyParams = getBodyParamsFromController($controllerAction);
     }
     
     return [
@@ -260,6 +114,127 @@ function getEndpointUsageInfo($method, $uri, $baseUrl) {
         'query_params' => $queryParams,
         'body_params' => $bodyParams
     ];
+}
+
+function getControllerFromUri($uri) {
+    // Ambil nama controller dan method dari URI
+    $parts = explode('/', trim($uri, '/'));
+    if (count($parts) > 0) {
+        $prefix = ucfirst($parts[0]);
+        $controllerName = isset($parts[1]) ? ucfirst($parts[1]) : '';
+        return "App\\Http\\Controllers\\{$prefix}\\{$controllerName}Controller";
+    }
+    return null;
+}
+
+function getQueryParamsFromController($controllerClass) {
+    if (!class_exists($controllerClass)) {
+        return [];
+    }
+    
+    $queryParams = [];
+    
+    // Refleksi untuk mendapatkan method index
+    try {
+        $reflection = new \ReflectionClass($controllerClass);
+        $method = $reflection->getMethod('index');
+        $docComment = $method->getDocComment();
+        
+        // Parse docblock untuk mendapatkan parameter query
+        if ($docComment) {
+            preg_match_all('/@param\s+([^\s]+)\s+\$([^\s]+)\s+(.*)/', $docComment, $matches);
+            for ($i = 0; $i < count($matches[0]); $i++) {
+                $queryParams[] = [
+                    'name' => $matches[2][$i],
+                    'type' => $matches[1][$i],
+                    'required' => false,
+                    'description' => trim($matches[3][$i])
+                ];
+            }
+        }
+        
+        // Jika tidak ada docblock, coba ambil dari validasi rules
+        if (empty($queryParams)) {
+            $instance = new $controllerClass();
+            if (method_exists($instance, 'rules')) {
+                $rules = $instance->rules();
+                foreach ($rules as $field => $rule) {
+                    $type = 'string';
+                    $required = false;
+                    
+                    if (is_string($rule)) {
+                        $ruleArray = explode('|', $rule);
+                        $required = in_array('required', $ruleArray);
+                        if (in_array('integer', $ruleArray)) $type = 'integer';
+                        if (in_array('numeric', $ruleArray)) $type = 'number';
+                        if (in_array('boolean', $ruleArray)) $type = 'boolean';
+                    }
+                    
+                    $queryParams[] = [
+                        'name' => $field,
+                        'type' => $type,
+                        'required' => $required,
+                        'description' => ucfirst(str_replace('_', ' ', $field))
+                    ];
+                }
+            }
+        }
+    } catch (\Exception $e) {
+        // Jika terjadi error, kembalikan array kosong
+        return [];
+    }
+    
+    return $queryParams;
+}
+
+function getBodyParamsFromController($controllerClass) {
+    if (!class_exists($controllerClass)) {
+        return [];
+    }
+    
+    $bodyParams = [];
+    
+    try {
+        $instance = new $controllerClass();
+        if (method_exists($instance, 'rules')) {
+            $rules = $instance->rules();
+            foreach ($rules as $field => $rule) {
+                $type = 'string';
+                $required = false;
+                $description = ucfirst(str_replace('_', ' ', $field));
+                
+                if (is_string($rule)) {
+                    $ruleArray = explode('|', $rule);
+                    $required = in_array('required', $ruleArray);
+                    
+                    if (in_array('integer', $ruleArray)) $type = 'integer';
+                    if (in_array('numeric', $ruleArray)) $type = 'number';
+                    if (in_array('boolean', $ruleArray)) $type = 'boolean';
+                    if (in_array('date', $ruleArray)) $type = 'date';
+                    if (in_array('email', $ruleArray)) $description .= ' (format email)';
+                    if (in_array('url', $ruleArray)) $description .= ' (format URL)';
+                    
+                    foreach ($ruleArray as $r) {
+                        if (strpos($r, 'max:') === 0) {
+                            $max = substr($r, 4);
+                            $description .= " (maks. $max karakter)";
+                        }
+                    }
+                }
+                
+                $bodyParams[] = [
+                    'name' => $field,
+                    'type' => $type,
+                    'required' => $required,
+                    'description' => $description
+                ];
+            }
+        }
+    } catch (\Exception $e) {
+        return [];
+    }
+    
+    return $bodyParams;
 }
 
 $router->get('/', function () use ($router) {
@@ -518,16 +493,7 @@ $router->get('/', function () use ($router) {
                             </div>";
             }
             
-            // Contoh Response
-            $responseExample = "{\n    \"status\": \"success\",\n    \"message\": \"Data berhasil diambil\",\n    \"data\": {}\n}";
-            
             $routesHtml .= "
-                            <div class='usage-section'>
-                                <div class='usage-label'>Contoh Response:</div>
-                                <div class='usage-code'>
-                                    <pre><code class='json'>" . htmlspecialchars($responseExample) . "</code></pre>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -892,22 +858,22 @@ $router->get('/', function () use ($router) {
     <body>
         <div class="container">
             <header>
-                <h1>API Documentation</h1>
-                <p>Dokumentasi lengkap untuk menggunakan API kami</p>
+                <h1>Dokumentasi API</h1>
+                <p>Dokumentasi lengkap untuk menggunakan API</p>
                 <span class="version">{$version}</span>
             </header>
 
             <div class="content">
                 <div class="section">
                     <h2>Daftar Endpoint</h2>
-                    <p>Berikut adalah daftar semua endpoint yang tersedia di API, dikelompokkan berdasarkan kategori:</p>
+                    <p>Berikut adalah daftar semua endpoint yang tersedia, dikelompokkan berdasarkan kategori:</p>
                     
                     {$routesHtml}
                 </div>
             </div>
             
             <div class="footer">
-                <p>&copy; {$year} API Documentation. Dibuat dengan ❤️ & Gabut.</p>
+                <p>&copy; {$year} Dokumentasi API. Dibuat dengan ❤️ & Gabut.</p>
             </div>
         </div>
         
@@ -1044,57 +1010,69 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
     });
 
     // Guru Routes
-    $router->group(['prefix' => 'guru', 'middleware' => ['login', 'guru']], function () use ($router) {
+    $router->group(['prefix' => 'guru', 'namespace' => 'Guru', 'middleware' => ['login', 'role:guru']], function () use ($router) {
         // Dashboard
-        $router->get('/dashboard', 'Guru\DashboardController@index');
+        $router->get('dashboard', ['uses' => 'DashboardController@index']);
+        $router->get('dashboard/kelas/{id}', ['uses' => 'DashboardController@detailKelas']);
         
-        // Data Peserta Kelas
-        $router->get('/kelas', 'Guru\KelasController@index');
-        $router->get('/kelas/{id}', 'Guru\KelasController@show');
-        $router->get('/kelas/{id}/siswa', 'Guru\KelasController@listSiswa');
+        // Kelas
+        $router->get('kelas', ['uses' => 'KelasController@index']);
+        $router->get('kelas/{id}', ['uses' => 'KelasController@show']);
+        $router->get('kelas/{id}/siswa', ['uses' => 'KelasController@listSiswa']);
+        
+        // Siswa
+        $router->get('siswa', ['uses' => 'SiswaController@index']);
+        $router->get('siswa/kelas/{kelasId}', ['uses' => 'SiswaController@getSiswaByKelas']);
+        $router->get('siswa/{id}', ['uses' => 'SiswaController@show']);
+        $router->post('siswa/kelas', ['uses' => 'SiswaController@addSiswaToKelas']);
+        $router->put('siswa/{id}/kelas', ['uses' => 'SiswaController@updateSiswaKelas']);
+        $router->delete('siswa/{id}/kelas', ['uses' => 'SiswaController@removeSiswaFromKelas']);
+        
+        // Mata Pelajaran
+        $router->get('mapel', ['uses' => 'MataPelajaranController@index']);
         
         // Capaian Pembelajaran
         $router->group(['prefix' => 'cp'], function () use ($router) {
-            $router->get('/', 'Guru\CapaianPembelajaranController@index');
-            $router->post('/', 'Guru\CapaianPembelajaranController@store');
-            $router->get('/{id}', 'Guru\CapaianPembelajaranController@show');
-            $router->put('/{id}', 'Guru\CapaianPembelajaranController@update');
-            $router->delete('/{id}', 'Guru\CapaianPembelajaranController@destroy');
-            $router->post('/batch', 'Guru\CapaianPembelajaranController@storeBatch');
+            $router->get('/', 'CapaianPembelajaranController@index');
+            $router->post('/', 'CapaianPembelajaranController@store');
+            $router->get('/{id}', 'CapaianPembelajaranController@show');
+            $router->put('/{id}', 'CapaianPembelajaranController@update');
+            $router->delete('/{id}', 'CapaianPembelajaranController@destroy');
+            $router->post('/batch', 'CapaianPembelajaranController@storeBatch');
         });
         
         // Tujuan Pembelajaran
         $router->group(['prefix' => 'tp'], function () use ($router) {
-            $router->get('/', 'Guru\TujuanPembelajaranController@index');
-            $router->post('/', 'Guru\TujuanPembelajaranController@store');
-            $router->get('/{id}', 'Guru\TujuanPembelajaranController@show');
-            $router->put('/{id}', 'Guru\TujuanPembelajaranController@update');
-            $router->delete('/{id}', 'Guru\TujuanPembelajaranController@destroy');
-            $router->post('/batch', 'Guru\TujuanPembelajaranController@storeBatch');
+            $router->get('/', 'TujuanPembelajaranController@index');
+            $router->post('/', 'TujuanPembelajaranController@store');
+            $router->get('/{id}', 'TujuanPembelajaranController@show');
+            $router->put('/{id}', 'TujuanPembelajaranController@update');
+            $router->delete('/{id}', 'TujuanPembelajaranController@destroy');
+            $router->post('/batch', 'TujuanPembelajaranController@storeBatch');
         });
 
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
-            $router->get('/', 'Guru\AbsensiController@index');
-            $router->post('/bulan', 'Guru\AbsensiController@createMonth');
-            $router->get('/bulan/{id}', 'Guru\AbsensiController@getMonthDetail');
-            $router->get('/bulan/{id}/siswa', 'Guru\AbsensiController@getStudentsByMonth');
-            $router->post('/siswa', 'Guru\AbsensiController@saveStudentAttendance');
-            $router->put('/siswa/{id}', 'Guru\AbsensiController@updateStudentAttendance');
-            $router->get('/rekap', 'Guru\AbsensiController@summary');
+            $router->get('/', 'AbsensiController@index');
+            $router->post('/bulan', 'AbsensiController@createMonth');
+            $router->get('/bulan/{id}', 'AbsensiController@getMonthDetail');
+            $router->get('/bulan/{id}/siswa', 'AbsensiController@getStudentsByMonth');
+            $router->post('/siswa', 'AbsensiController@saveStudentAttendance');
+            $router->put('/siswa/{id}', 'AbsensiController@updateStudentAttendance');
+            $router->get('/rekap', 'AbsensiController@summary');
         });
         
         // Penilaian Siswa
         $router->group(['prefix' => 'nilai'], function () use ($router) {
-            $router->get('/', 'Guru\NilaiController@index');
-            $router->post('/', 'Guru\NilaiController@store');
-            $router->post('/batch', 'Guru\NilaiController@storeBatch');
-            $router->get('/template', 'Guru\NilaiController@getTemplate');
-            $router->post('/import', 'Guru\NilaiController@import');
-            $router->get('/rekap', 'Guru\RekapController@nilai');
-            $router->get('/export', 'Guru\NilaiController@export');
-            $router->get('/{id}', 'Guru\NilaiController@show');
-            $router->put('/{id}', 'Guru\NilaiController@update');
+            $router->get('/', 'NilaiController@index');
+            $router->post('/', 'NilaiController@store');
+            $router->post('/batch', 'NilaiController@storeBatch');
+            $router->get('/template', 'NilaiController@getTemplate');
+            $router->post('/import', 'NilaiController@import');
+            $router->get('/rekap', 'RekapController@nilai');
+            $router->get('/export', 'NilaiController@export');
+            $router->get('/{id}', 'NilaiController@show');
+            $router->put('/{id}', 'NilaiController@update');
         });        
         
     });

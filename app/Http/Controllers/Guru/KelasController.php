@@ -17,13 +17,34 @@ class KelasController extends BaseGuruController
         try {
             $guru = Auth::user()->guru;
             
-            // Ambil kelas yang diajar oleh guru
-            $kelas = Kelas::whereHas('mataPelajaran', function($q) use ($guru) {
-                $q->where('guru_id', $guru->id);
-            })->get();
+            // Debug: Log ID guru
+            \Log::info('ID Guru yang login: ' . $guru->id);
+            
+            // Buat query builder
+            $query = Kelas::select('kelas.*')
+                ->join('pertemuan', 'pertemuan.kelas_id', '=', 'kelas.id')
+                ->where('pertemuan.guru_id', $guru->id)
+                ->whereNull('kelas.deleted_at')
+                ->distinct();
+            
+            // Debug: Log query yang akan dijalankan
+            \Log::info('Query Kelas:', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings()
+            ]);
+            
+            // Jalankan query
+            $kelas = $query->get();
+            
+            // Debug: Log hasil query
+            \Log::info('Hasil Query:', [
+                'total' => $kelas->count(),
+                'data' => $kelas->toArray()
+            ]);
             
             return ResponseBuilder::success(200, "Berhasil mendapatkan data kelas", $kelas);
         } catch (\Exception $e) {
+            \Log::error('Error di KelasController@index: ' . $e->getMessage());
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }
     }
@@ -39,8 +60,8 @@ class KelasController extends BaseGuruController
             $guru = Auth::user()->guru;
             
             $kelas = Kelas::with(['waliKelas'])
-                ->whereHas('mataPelajaran', function($q) use ($guru) {
-                    $q->where('guru_id', $guru->id);
+                ->whereHas('pertemuan', function($q) use ($guru) {
+                    $q->where('pertemuan.guru_id', $guru->id);
                 })->find($id);
             
             if (!$kelas) {
@@ -63,8 +84,8 @@ class KelasController extends BaseGuruController
 
             $guru = Auth::user()->guru;
             
-            $kelas = Kelas::whereHas('mataPelajaran', function($q) use ($guru) {
-                $q->where('guru_id', $guru->id);
+            $kelas = Kelas::whereHas('pertemuan', function($q) use ($guru) {
+                $q->where('pertemuan.guru_id', $guru->id);
             })->find($id);
             
             if (!$kelas) {
