@@ -21,11 +21,8 @@ class KelasController extends BaseGuruController
             \Log::info('ID Guru yang login: ' . $guru->id);
             
             // Buat query builder
-            $query = Kelas::select('kelas.*')
-                ->join('pertemuan', 'pertemuan.kelas_id', '=', 'kelas.id')
-                ->where('pertemuan.guru_id', $guru->id)
-                ->whereNull('kelas.deleted_at')
-                ->distinct();
+            $query = Kelas::where('guru_id', $guru->id)
+                ->whereNull('deleted_at');
             
             // Debug: Log query yang akan dijalankan
             \Log::info('Query Kelas:', [
@@ -60,9 +57,8 @@ class KelasController extends BaseGuruController
             $guru = Auth::user()->guru;
             
             $kelas = Kelas::with(['waliKelas'])
-                ->whereHas('pertemuan', function($q) use ($guru) {
-                    $q->where('pertemuan.guru_id', $guru->id);
-                })->find($id);
+                ->where('guru_id', $guru->id)
+                ->find($id);
             
             if (!$kelas) {
                 return ResponseBuilder::error(404, "Data kelas tidak ditemukan");
@@ -84,9 +80,8 @@ class KelasController extends BaseGuruController
 
             $guru = Auth::user()->guru;
             
-            $kelas = Kelas::whereHas('pertemuan', function($q) use ($guru) {
-                $q->where('pertemuan.guru_id', $guru->id);
-            })->find($id);
+            $kelas = Kelas::where('guru_id', $guru->id)
+                ->find($id);
             
             if (!$kelas) {
                 return ResponseBuilder::error(404, "Data kelas tidak ditemukan");

@@ -103,6 +103,18 @@ class SiswaController extends BaseAdminController
             $admin = Auth::user();
             $file = $request->file('file');
             
+            // Dapatkan atau buat kelas bayangan
+            $kelasBayangan = Kelas::firstOrCreate(
+                [
+                    'nama_kelas' => 'Kelas Bayangan',
+                    'sekolah_id' => $admin->sekolah_id,
+                    'tahun' => date('Y')
+                ],
+                [
+                    'tingkat' => 0
+                ]
+            );
+            
             // Load spreadsheet
             $spreadsheet = IOFactory::load($file->getPathname());
             $worksheet = $spreadsheet->getActiveSheet();
@@ -121,13 +133,12 @@ class SiswaController extends BaseAdminController
                     continue;
                 }
                 
-                $rowNumber = $index + 2; // +2 karena index dimulai dari 0 dan header di baris 1
+                $rowNumber = $index + 2;
                 
                 // Validasi data
                 $nisn = trim($row[0] ?? '');
                 $nama = trim($row[1] ?? '');
                 $jenisKelamin = trim($row[2] ?? '');
-                $kelasId = trim($row[3] ?? '');
                 
                 // Validasi NISN
                 if (empty($nisn)) {
@@ -147,25 +158,12 @@ class SiswaController extends BaseAdminController
                     continue;
                 }
                 
-                // Validasi kelas
-                if (empty($kelasId)) {
-                    $errors[] = "Baris $rowNumber: ID Kelas tidak boleh kosong";
-                    continue;
-                }
-                
-                // Cek apakah kelas ada
-                $kelas = Kelas::where('id', $kelasId)->where('sekolah_id', $admin->sekolah_id)->first();
-                if (!$kelas) {
-                    $errors[] = "Baris $rowNumber: Kelas dengan ID $kelasId tidak ditemukan";
-                    continue;
-                }
-                
-                // Buat data siswa
+                // Buat data siswa dengan kelas bayangan
                 $siswa = Siswa::create([
                     'nisn' => $nisn,
                     'nama' => $nama,
                     'jenis_kelamin' => $jenisKelamin,
-                    'kelas_id' => $kelasId,
+                    'kelas_id' => $kelasBayangan->id,
                     'sekolah_id' => $admin->sekolah_id
                 ]);
                 
@@ -174,7 +172,7 @@ class SiswaController extends BaseAdminController
                     'nisn' => $nisn,
                     'nama' => $nama,
                     'jenis_kelamin' => $jenisKelamin,
-                    'kelas_id' => $kelasId
+                    'kelas_id' => $kelasBayangan->id
                 ];
                 
                 $imported++;
@@ -308,23 +306,20 @@ class SiswaController extends BaseAdminController
             $sheet->setCellValue('A1', 'nisn');
             $sheet->setCellValue('B1', 'nama');
             $sheet->setCellValue('C1', 'jenis_kelamin');
-            $sheet->setCellValue('D1', 'kelas_id');
             
             // Contoh data
             $sheet->setCellValue('A2', 'Contoh: 1234567890');
             $sheet->setCellValue('B2', 'Contoh: Budi Santoso');
             $sheet->setCellValue('C2', 'Contoh: L');
-            $sheet->setCellValue('D2', 'Contoh: (Isi dengan ID kelas yang valid)');
             
             // Tambahkan catatan di baris ketiga
-            $sheet->setCellValue('A3', 'Catatan: Kolom Nama, NISN, Jenis Kelamin, dan ID Kelas wajib diisi');
-            $sheet->mergeCells('A3:D3');
+            $sheet->setCellValue('A3', 'Catatan: Kolom Nama, NISN, dan Jenis Kelamin wajib diisi. Siswa akan otomatis masuk ke kelas bayangan.');
+            $sheet->mergeCells('A3:C3');
             
             // Atur lebar kolom agar lebih mudah dibaca
             $sheet->getColumnDimension('A')->setWidth(25);
             $sheet->getColumnDimension('B')->setWidth(15);
             $sheet->getColumnDimension('C')->setWidth(20);
-            $sheet->getColumnDimension('D')->setWidth(30);
             
             // Atur style untuk header
             $headerStyle = [
@@ -334,13 +329,13 @@ class SiswaController extends BaseAdminController
                     'startColor' => ['rgb' => 'E0E0E0']
                 ]
             ];
-            $sheet->getStyle('A1:D1')->applyFromArray($headerStyle);
+            $sheet->getStyle('A1:C1')->applyFromArray($headerStyle);
             
             // Atur style untuk catatan
             $noteStyle = [
                 'font' => ['italic' => true, 'color' => ['rgb' => '808080']]
             ];
-            $sheet->getStyle('A3:D3')->applyFromArray($noteStyle);
+            $sheet->getStyle('A3:C3')->applyFromArray($noteStyle);
             
             $filename = 'template_import_siswa.xlsx';
             

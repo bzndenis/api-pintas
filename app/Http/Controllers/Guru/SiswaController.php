@@ -21,9 +21,12 @@ class SiswaController extends BaseGuruController
             $guru = Auth::user()->guru;
             $sekolahId = Auth::user()->sekolah_id;
             
-            // Ambil siswa berdasarkan sekolah yang sama dengan guru
+            // Ambil siswa berdasarkan kelas yang diajar oleh guru
             $query = Siswa::with(['kelas'])
-                ->where('sekolah_id', $sekolahId);
+                ->where('sekolah_id', $sekolahId)
+                ->whereHas('kelas', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                });
             
             // Filter berdasarkan nama (jika ada)
             if ($request->search) {
@@ -62,9 +65,8 @@ class SiswaController extends BaseGuruController
             ]);
             
             // Periksa apakah kelas tersebut diajar oleh guru yang login
-            $query = Kelas::select('kelas.*')
-                ->join('pertemuan', 'pertemuan.kelas_id', '=', 'kelas.id')
-                ->where('pertemuan.guru_id', $guru->id)
+            $query = Kelas::with(['mataPelajaran'])
+                ->where('guru_id', $guru->id)
                 ->where('kelas.id', $kelasId)
                 ->whereNull('kelas.deleted_at');
             
@@ -134,7 +136,7 @@ class SiswaController extends BaseGuruController
             $siswa = Siswa::with(['kelas'])
                 ->where('id', $id)
                 ->where('sekolah_id', $sekolahId)
-                ->whereHas('kelas.mataPelajaran', function($q) use ($guru) {
+                ->whereHas('kelas', function($q) use ($guru) {
                     $q->where('guru_id', $guru->id);
                 })
                 ->first();
@@ -173,11 +175,9 @@ class SiswaController extends BaseGuruController
             ]);
             
             // Periksa apakah kelas tersebut diajar oleh guru yang login
-            $query = Kelas::select('kelas.*')
-                ->join('pertemuan', 'pertemuan.kelas_id', '=', 'kelas.id')
-                ->where('pertemuan.guru_id', $guru->id)
-                ->where('kelas.id', $request->kelas_id)
-                ->whereNull('kelas.deleted_at');
+            $query = Kelas::where('guru_id', $guru->id)
+                ->where('id', $request->kelas_id)
+                ->whereNull('deleted_at');
             
             // Debug: Log query
             \Log::info('Query:', [
@@ -251,11 +251,9 @@ class SiswaController extends BaseGuruController
             ]);
             
             // Periksa apakah kelas tersebut diajar oleh guru yang login
-            $query = Kelas::select('kelas.*')
-                ->join('pertemuan', 'pertemuan.kelas_id', '=', 'kelas.id')
-                ->where('pertemuan.guru_id', $guru->id)
-                ->where('kelas.id', $request->kelas_id)
-                ->whereNull('kelas.deleted_at');
+            $query = Kelas::where('guru_id', $guru->id)
+                ->where('id', $request->kelas_id)
+                ->whereNull('deleted_at');
             
             // Debug: Log query
             \Log::info('Query:', [
@@ -320,7 +318,7 @@ class SiswaController extends BaseGuruController
             // Periksa apakah siswa tersebut ada di sekolah yang sama dan diajar oleh guru
             $siswa = Siswa::where('id', $id)
                 ->where('sekolah_id', $sekolahId)
-                ->whereHas('kelas.mataPelajaran', function($q) use ($guru) {
+                ->whereHas('kelas', function($q) use ($guru) {
                     $q->where('guru_id', $guru->id);
                 })
                 ->first();
