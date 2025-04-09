@@ -62,10 +62,10 @@ class TujuanPembelajaranController extends BaseGuruController
     public function store(Request $request)
     {
         $this->validate($request, [
-            'kode_tp' => 'required|string|max:20',
             'deskripsi' => 'required|string',
             'bobot' => 'required|numeric|min:0|max:100',
-            'cp_id' => 'required|exists:capaian_pembelajaran,id'
+            'cp_id' => 'required|exists:capaian_pembelajaran,id',
+            'kode_tp' => 'nullable|string|max:20'
         ]);
 
         try {
@@ -80,6 +80,21 @@ class TujuanPembelajaranController extends BaseGuruController
             
             if (!$cp) {
                 return ResponseBuilder::error(403, "Anda tidak memiliki akses untuk capaian pembelajaran ini");
+            }
+
+            // Generate kode TP otomatis jika tidak diisi
+            if (!$request->kode_tp) {
+                $lastTP = TujuanPembelajaran::where('cp_id', $request->cp_id)
+                    ->where('sekolah_id', $guru->sekolah_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                $counter = 1;
+                if ($lastTP && preg_match('/(\d+)$/', $lastTP->kode_tp, $matches)) {
+                    $counter = intval($matches[1]) + 1;
+                }
+
+                $request->merge(['kode_tp' => 'TP.' . $cp->kode_cp . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT)]);
             }
             
             // Validasi kode TP unik per CP dan sekolah
@@ -112,7 +127,7 @@ class TujuanPembelajaranController extends BaseGuruController
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'kode_tp' => 'required|string|max:50',
+            'kode_tp' => 'nullable|string|max:50',
             'deskripsi' => 'required|string',
             'capaian_pembelajaran_id' => 'required|exists:capaian_pembelajaran,id'
         ]);
@@ -185,10 +200,10 @@ class TujuanPembelajaranController extends BaseGuruController
     {
         $this->validate($request, [
             'data' => 'required|array|min:1',
-            'data.*.kode_tp' => 'required|string|max:20',
             'data.*.deskripsi' => 'required|string',
             'data.*.bobot' => 'required|numeric|min:0|max:100',
-            'data.*.cp_id' => 'required|string|uuid|exists:capaian_pembelajaran,id'
+            'data.*.cp_id' => 'required|string|uuid|exists:capaian_pembelajaran,id',
+            'data.*.kode_tp' => 'nullable|string|max:20'
         ]);
 
         try {
@@ -219,6 +234,21 @@ class TujuanPembelajaranController extends BaseGuruController
                             'error' => "Capaian pembelajaran tidak ditemukan"
                         ];
                         continue;
+                    }
+                    
+                    // Generate kode TP otomatis jika tidak diisi
+                    if (empty($data['kode_tp'])) {
+                        $lastTP = TujuanPembelajaran::where('cp_id', $data['cp_id'])
+                            ->where('sekolah_id', $guru->sekolah_id)
+                            ->orderBy('created_at', 'desc')
+                            ->first();
+
+                        $counter = 1;
+                        if ($lastTP && preg_match('/(\d+)$/', $lastTP->kode_tp, $matches)) {
+                            $counter = intval($matches[1]) + 1;
+                        }
+
+                        $data['kode_tp'] = 'TP.' . $cp->kode_cp . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
                     }
                     
                     // Validasi kode TP unik per CP dan sekolah

@@ -41,6 +41,23 @@ class CapaianPembelajaran extends Model
         
         static::creating(function ($model) {
             $model->id = Uuid::uuid4()->toString();
+            
+            // Generate kode CP otomatis jika tidak diisi
+            if (empty($model->kode_cp)) {
+                $lastCP = self::where('mapel_id', $model->mapel_id)
+                    ->where('sekolah_id', $model->sekolah_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                $counter = 1;
+                if ($lastCP && preg_match('/(\d+)$/', $lastCP->kode_cp, $matches)) {
+                    $counter = intval($matches[1]) + 1;
+                }
+
+                $mataPelajaran = MataPelajaran::find($model->mapel_id);
+                $kodeMapel = $mataPelajaran ? $mataPelajaran->kode : 'MP';
+                $model->kode_cp = 'CP.' . $kodeMapel . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+            }
         });
     }
     
