@@ -62,6 +62,7 @@ class CapaianPembelajaranController extends BaseGuruController
     {
         $this->validate($request, [
             'kode_cp' => 'nullable|string|max:20',
+            'nama' => 'nullable|string|max:255',
             'deskripsi' => 'required|string',
             'mapel_id' => 'required|exists:mata_pelajaran,id'
         ]);
@@ -113,6 +114,7 @@ class CapaianPembelajaranController extends BaseGuruController
             
             $cp = CapaianPembelajaran::create([
                 'kode_cp' => $request->kode_cp,
+                'nama' => $request->nama,
                 'deskripsi' => $request->deskripsi,
                 'mapel_id' => $request->mapel_id,
                 'sekolah_id' => $guru->sekolah_id
@@ -131,6 +133,7 @@ class CapaianPembelajaranController extends BaseGuruController
     {
         $this->validate($request, [
             'kode_cp' => 'nullable|string|max:20',
+            'nama' => 'nullable|string|max:255',
             'deskripsi' => 'required|string',
             'mapel_id' => 'required|exists:mata_pelajaran,id'
         ]);
@@ -172,6 +175,7 @@ class CapaianPembelajaranController extends BaseGuruController
             
             $cp->update([
                 'kode_cp' => $request->kode_cp,
+                'nama' => $request->nama,
                 'deskripsi' => $request->deskripsi,
                 'mapel_id' => $request->mapel_id
             ]);
@@ -224,6 +228,7 @@ class CapaianPembelajaranController extends BaseGuruController
         $this->validate($request, [
             'capaian' => 'required|array|min:1',
             'capaian.*.kode_cp' => 'nullable|string|max:20',
+            'capaian.*.nama' => 'nullable|string|max:255',
             'capaian.*.deskripsi' => 'required|string',
             'capaian.*.mapel_id' => 'required|string|uuid|exists:mata_pelajaran,id'
         ]);
@@ -293,6 +298,7 @@ class CapaianPembelajaranController extends BaseGuruController
                     $insertData = [
                         'id' => $cpId,
                         'kode_cp' => $data['kode_cp'],
+                        'nama' => $data['nama'] ?? null,
                         'deskripsi' => $data['deskripsi'],
                         'mapel_id' => $data['mapel_id'],
                         'sekolah_id' => $guru->sekolah_id,
@@ -307,6 +313,7 @@ class CapaianPembelajaranController extends BaseGuruController
                     $importedData[] = [
                         'id' => $cpId,
                         'kode_cp' => $data['kode_cp'],
+                        'nama' => $data['nama'] ?? null,
                         'deskripsi' => $data['deskripsi'],
                         'mapel_id' => $data['mapel_id']
                     ];

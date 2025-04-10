@@ -63,6 +63,7 @@ class TujuanPembelajaranController extends BaseGuruController
     {
         $this->validate($request, [
             'deskripsi' => 'required|string',
+            'nama' => 'nullable|string|max:255',
             'bobot' => 'required|numeric|min:0|max:100',
             'cp_id' => 'required|exists:capaian_pembelajaran,id',
             'kode_tp' => 'nullable|string|max:20'
@@ -109,6 +110,7 @@ class TujuanPembelajaranController extends BaseGuruController
             
             $tp = TujuanPembelajaran::create([
                 'kode_tp' => $request->kode_tp,
+                'nama' => $request->nama,
                 'deskripsi' => $request->deskripsi,
                 'bobot' => $request->bobot,
                 'cp_id' => $request->cp_id,
@@ -128,6 +130,7 @@ class TujuanPembelajaranController extends BaseGuruController
     {
         $this->validate($request, [
             'kode_tp' => 'nullable|string|max:50',
+            'nama' => 'nullable|string|max:255',
             'deskripsi' => 'required|string',
             'capaian_pembelajaran_id' => 'required|exists:capaian_pembelajaran,id'
         ]);
@@ -201,6 +204,7 @@ class TujuanPembelajaranController extends BaseGuruController
         $this->validate($request, [
             'data' => 'required|array|min:1',
             'data.*.deskripsi' => 'required|string',
+            'data.*.nama' => 'nullable|string|max:255',
             'data.*.bobot' => 'required|numeric|min:0|max:100',
             'data.*.cp_id' => 'required|string|uuid|exists:capaian_pembelajaran,id',
             'data.*.kode_tp' => 'nullable|string|max:20'
@@ -273,6 +277,7 @@ class TujuanPembelajaranController extends BaseGuruController
                     $insertData = [
                         'id' => $tpId,
                         'kode_tp' => $data['kode_tp'],
+                        'nama' => $data['nama'] ?? null,
                         'deskripsi' => $data['deskripsi'],
                         'bobot' => $data['bobot'],
                         'cp_id' => $data['cp_id'],
@@ -288,6 +293,7 @@ class TujuanPembelajaranController extends BaseGuruController
                     $importedData[] = [
                         'id' => $tpId,
                         'kode_tp' => $data['kode_tp'],
+                        'nama' => $data['nama'] ?? null,
                         'deskripsi' => $data['deskripsi'],
                         'bobot' => $data['bobot'],
                         'cp_id' => $data['cp_id']

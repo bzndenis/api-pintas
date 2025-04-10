@@ -18,6 +18,7 @@ class CapaianPembelajaran extends Model
     protected $fillable = [
         'id',
         'kode_cp',
+        'nama',
         'deskripsi',
         'mapel_id',
         'sekolah_id',
@@ -55,8 +56,19 @@ class CapaianPembelajaran extends Model
                 }
 
                 $mataPelajaran = MataPelajaran::find($model->mapel_id);
-                $kodeMapel = $mataPelajaran ? $mataPelajaran->kode : 'MP';
-                $model->kode_cp = 'CP.' . $kodeMapel . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+                $kodeMapel = $mataPelajaran ? strtoupper($mataPelajaran->nama) : 'MP';
+                $kodeMapel = preg_replace('/[^A-Z]/', '', $kodeMapel); // Ambil huruf kapital saja
+                if (empty($kodeMapel)) {
+                    $kodeMapel = 'MP';
+                }
+                $model->kode_cp = $kodeMapel . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+            }
+
+            // Generate nama CP otomatis hanya jika nama tidak diisi
+            if (empty($model->nama)) {
+                $mataPelajaran = MataPelajaran::find($model->mapel_id);
+                $mapelNama = $mataPelajaran ? $mataPelajaran->nama : 'Mata Pelajaran';
+                $model->nama = "CP " . $model->kode_cp . " - " . $mapelNama;
             }
         });
     }

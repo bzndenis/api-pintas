@@ -18,6 +18,7 @@ class TujuanPembelajaran extends Model
     protected $fillable = [
         'id',
         'kode_tp',
+        'nama',
         'deskripsi',
         'bobot',
         'cp_id',
@@ -43,6 +44,29 @@ class TujuanPembelajaran extends Model
         
         static::creating(function ($model) {
             $model->id = Uuid::uuid4()->toString();
+
+            // Generate kode TP otomatis jika tidak diisi
+            if (empty($model->kode_tp)) {
+                $lastTP = self::where('cp_id', $model->cp_id)
+                    ->where('sekolah_id', $model->sekolah_id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                $counter = 1;
+                if ($lastTP && preg_match('/(\d+)$/', $lastTP->kode_tp, $matches)) {
+                    $counter = intval($matches[1]) + 1;
+                }
+
+                $cp = CapaianPembelajaran::find($model->cp_id);
+                $model->kode_tp = 'TP.' . ($cp ? $cp->kode_cp : '') . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+            }
+
+            // Generate nama TP otomatis hanya jika nama tidak diisi
+            if (empty($model->nama)) {
+                $cp = CapaianPembelajaran::find($model->cp_id);
+                $cpNama = $cp ? $cp->nama : 'CP';
+                $model->nama = "TP " . $model->kode_tp . " - " . $cpNama;
+            }
         });
     }
     
