@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use App\Http\Helper\ResponseBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Uuid;
+use Ramsey\Uuid\Uuid;
 use App\Models\CapaianPembelajaran;
 use App\Models\Kelas;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -275,64 +275,85 @@ class NilaiController extends BaseGuruController
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
-            // Set judul sheet
-            $sheet->setTitle('Template Nilai');
+            // Set judul sheet dengan format yang lebih jelas
+            $sheet->setTitle('Input Nilai');
             
-            // Header informasi
+            // Header informasi dengan format yang lebih rapi
             $sheet->setCellValue('A1', 'TEMPLATE INPUT NILAI SISWA');
             $sheet->setCellValue('A2', 'Kelas: ' . Kelas::find($request->kelas_id)->nama_kelas);
-            $sheet->setCellValue('A3', 'Mata Pelajaran: ' . $cp->mataPelajaran->nama);
+            $sheet->setCellValue('A3', 'Mata Pelajaran: ' . $cp->mataPelajaran->nama_mapel);
             $sheet->setCellValue('A4', 'Capaian Pembelajaran: ' . $cp->deskripsi);
             
-            // Merge cells untuk header informasi
-            $sheet->mergeCells('A1:E1');
-            $sheet->mergeCells('A2:E2');
-            $sheet->mergeCells('A3:E3');
-            $sheet->mergeCells('A4:E4');
-            
-            // Header tabel
-            $sheet->setCellValue('A6', 'NISN');
-            $sheet->setCellValue('B6', 'Nama Siswa');
-            $sheet->setCellValue('C6', 'ID Siswa');
-            $sheet->setCellValue('D6', 'ID TP');
+            // Merge cells untuk header
+            $sheet->mergeCells('A1:G1');
+            $sheet->mergeCells('A2:G2');
+            $sheet->mergeCells('A3:G3');
+            $sheet->mergeCells('A4:G4');
+
+            // Header tabel dengan format yang lebih informatif
+            $sheet->setCellValue('A6', 'No');
+            $sheet->setCellValue('B6', 'NISN');
+            $sheet->setCellValue('C6', 'Nama Siswa');
+            $sheet->setCellValue('D6', 'Tujuan Pembelajaran');
             $sheet->setCellValue('E6', 'Nilai');
+            $sheet->setCellValue('F6', 'ID Siswa (Jangan Diubah)');
+            $sheet->setCellValue('G6', 'ID TP (Jangan Diubah)');
             
             // Style untuk header
             $headerStyle = [
                 'font' => ['bold' => true],
                 'fill' => [
-                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'E0E0E0']
                 ],
                 'alignment' => [
-                    'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
                 ]
             ];
-            $sheet->getStyle('A1:E6')->applyFromArray($headerStyle);
+            $sheet->getStyle('A1:G6')->applyFromArray($headerStyle);
             
-            // Isi data
+            // Isi data dengan nomor urut
             $row = 7;
+            $no = 1;
             foreach ($siswa as $s) {
                 foreach ($tujuanPembelajaran as $tp) {
-                    $sheet->setCellValue('A' . $row, $s->nisn);
-                    $sheet->setCellValue('B' . $row, $s->nama);
-                    $sheet->setCellValue('C' . $row, $s->id);
-                    $sheet->setCellValue('D' . $row, $tp->id);
+                    $sheet->setCellValue('A' . $row, $no);
+                    $sheet->setCellValue('B' . $row, $s->nisn);
+                    $sheet->setCellValue('C' . $row, $s->nama);
+                    $sheet->setCellValue('D' . $row, $tp->kode_tp . ' - ' . $tp->deskripsi);
+                    $sheet->setCellValue('F' . $row, $s->id);
+                    $sheet->setCellValue('G' . $row, $tp->id);
+                    
+                    // Proteksi kolom ID
+                    $sheet->getStyle('F' . $row)->getProtection()->setLocked(true);
+                    $sheet->getStyle('G' . $row)->getProtection()->setLocked(true);
+                    
+                    // Style untuk baris data
+                    $sheet->getStyle('A' . $row . ':G' . $row)->getAlignment()
+                        ->setVertical(Alignment::VERTICAL_CENTER);
+                    
                     $row++;
+                    $no++;
                 }
             }
+
+            // Sembunyikan kolom ID
+            $sheet->getColumnDimension('F')->setVisible(false);
+            $sheet->getColumnDimension('G')->setVisible(false);
             
-            // Tambahkan catatan
-            $row += 2;
-            $sheet->setCellValue('A' . $row, 'Catatan:');
-            $row++;
-            $sheet->setCellValue('A' . $row, '1. Jangan mengubah ID Siswa dan ID TP');
-            $row++;
-            $sheet->setCellValue('A' . $row, '2. Nilai harus diisi dengan angka 0-100');
-            $row++;
-            $sheet->setCellValue('A' . $row, '3. File yang diunggah harus dalam format Excel (.xlsx atau .xls)');
+            // Proteksi worksheet
+            $sheet->getProtection()->setSheet(true);
             
-            // Auto-size kolom
+            // Beri warna berbeda untuk kolom nilai
+            $sheet->getStyle('E7:E' . ($row-1))->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('FFFFFF');
+                
+            // Unlock kolom nilai untuk editing
+            $sheet->getStyle('E7:E' . ($row-1))->getProtection()->setLocked(false);
+            
+            // Auto-size kolom yang visible
             foreach (range('A', 'E') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
@@ -475,6 +496,145 @@ class NilaiController extends BaseGuruController
                 });
                 
             return ResponseBuilder::success(200, "Berhasil mendapatkan rekap nilai", $nilaiSiswa);
+        } catch (\Exception $e) {
+            return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
+        }
+    }
+
+    public function storeBatchFromUI(Request $request)
+    {
+        $this->validate($request, [
+            'nilai_batch' => 'required|array|min:1',
+            'nilai_batch.*.siswa_id' => 'required|exists:siswa,id',
+            'nilai_batch.*.nilai' => 'required|numeric|min:0|max:100',
+            'tp_id' => 'required|exists:tujuan_pembelajaran,id'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            $guru = Auth::user()->guru;
+            $tp = TujuanPembelajaran::with('capaianPembelajaran.mataPelajaran')
+                ->find($request->tp_id);
+                
+            // Validasi akses guru ke mata pelajaran
+            if (!$tp || $tp->capaianPembelajaran->mataPelajaran->guru_id !== $guru->id) {
+                return ResponseBuilder::error(403, "Anda tidak memiliki akses untuk menilai mata pelajaran ini");
+            }
+
+            $hasilInput = [];
+            $hasilUpdate = [];
+            $errors = [];
+
+            foreach ($request->nilai_batch as $nilaiData) {
+                try {
+                    // Validasi format UUID untuk siswa_id
+                    if (!Uuid::isValid($nilaiData['siswa_id'])) {
+                        throw new \Exception("Format ID Siswa tidak valid");
+                    }
+
+                    // Cek apakah nilai sudah ada
+                    $existingNilai = NilaiSiswa::where('siswa_id', $nilaiData['siswa_id'])
+                        ->where('tp_id', $request->tp_id)
+                        ->where('sekolah_id', $guru->sekolah_id)
+                        ->first();
+
+                    if ($existingNilai) {
+                        // Update nilai yang sudah ada
+                        $existingNilai->update([
+                            'nilai' => $nilaiData['nilai'],
+                            'updated_by' => Auth::id()
+                        ]);
+                        $hasilUpdate[] = $existingNilai;
+                    } else {
+                        // Buat nilai baru dengan UUID v4
+                        $nilai = NilaiSiswa::create([
+                            'id' => Uuid::uuid4()->toString(), // Generate UUID menggunakan Ramsey\Uuid
+                            'siswa_id' => $nilaiData['siswa_id'],
+                            'tp_id' => $request->tp_id,
+                            'nilai' => $nilaiData['nilai'],
+                            'created_by' => Auth::id(),
+                            'sekolah_id' => $guru->sekolah_id
+                        ]);
+                        $hasilInput[] = $nilai;
+                    }
+                } catch (\Exception $e) {
+                    $siswa = Siswa::find($nilaiData['siswa_id']);
+                    $errors[] = [
+                        'siswa' => $siswa ? $siswa->nama : 'Unknown',
+                        'message' => "Gagal menyimpan nilai: " . $e->getMessage()
+                    ];
+                }
+            }
+
+            // Jika semua data error, rollback transaksi
+            if (count($errors) === count($request->nilai_batch)) {
+                DB::rollBack();
+                return ResponseBuilder::error(400, "Gagal menyimpan semua data nilai", ['errors' => $errors]);
+            }
+
+            DB::commit();
+
+            return ResponseBuilder::success(201, "Berhasil menyimpan data nilai", [
+                'nilai_baru' => $hasilInput,
+                'nilai_diupdate' => $hasilUpdate,
+                'total_success' => count($hasilInput) + count($hasilUpdate),
+                'total_error' => count($errors),
+                'errors' => $errors
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ResponseBuilder::error(500, "Gagal menyimpan data nilai: " . $e->getMessage());
+        }
+    }
+
+    public function getSiswaWithTP(Request $request)
+    {
+        try {
+            $guru = Auth::user()->guru;
+            
+            // Validasi request
+            $this->validate($request, [
+                'kelas_id' => 'required|exists:kelas,id',
+                'cp_id' => 'required|exists:capaian_pembelajaran,id'
+            ]);
+
+            // Dapatkan daftar siswa berdasarkan kelas
+            $siswa = Siswa::where('kelas_id', $request->kelas_id)
+                ->where('sekolah_id', $guru->sekolah_id)
+                ->orderBy('nama', 'asc')
+                ->get(['id', 'nama']);
+
+            // Dapatkan tujuan pembelajaran berdasarkan CP
+            $tujuanPembelajaran = TujuanPembelajaran::with(['capaianPembelajaran.mataPelajaran'])
+                ->where('cp_id', $request->cp_id)
+                ->whereHas('capaianPembelajaran.mataPelajaran', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                })
+                ->get(['id', 'kode_tp', 'deskripsi']);
+
+            // Dapatkan nilai yang sudah ada
+            $existingNilai = NilaiSiswa::where('sekolah_id', $guru->sekolah_id)
+                ->whereIn('siswa_id', $siswa->pluck('id'))
+                ->whereIn('tp_id', $tujuanPembelajaran->pluck('id'))
+                ->get()
+                ->groupBy('siswa_id');
+
+            // Format response
+            $result = $siswa->map(function($s) use ($existingNilai) {
+                return [
+                    'id' => $s->id,
+                    'nama' => $s->nama,
+                    'nilai' => isset($existingNilai[$s->id]) ? $existingNilai[$s->id]->pluck('nilai', 'tp_id') : []
+                ];
+            });
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan data siswa dan TP", [
+                'siswa' => $result,
+                'tujuan_pembelajaran' => $tujuanPembelajaran
+            ]);
+
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mendapatkan data: " . $e->getMessage());
         }

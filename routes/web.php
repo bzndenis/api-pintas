@@ -1058,6 +1058,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->get('/bulan/{id}', 'AbsensiController@getMonthDetail');
             $router->get('/bulan/{id}/siswa', 'AbsensiController@getStudentsByMonth');
             $router->post('/siswa', 'AbsensiController@saveStudentAttendance');
+            $router->post('/siswa/batch', 'AbsensiController@storeBatch');
             $router->put('/siswa/{id}', 'AbsensiController@updateStudentAttendance');
             $router->get('/rekap', 'AbsensiController@summary');
         });
@@ -1066,11 +1067,12 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->group(['prefix' => 'nilai'], function () use ($router) {
             $router->get('/', 'NilaiController@index');
             $router->post('/', 'NilaiController@store');
-            $router->post('/batch', 'NilaiController@storeBatch');
+            $router->post('/batch', 'NilaiController@storeBatchFromUI');
             $router->get('/template', 'NilaiController@getTemplate');
             $router->post('/import', 'NilaiController@import');
             $router->get('/rekap', 'RekapController@nilai');
             $router->get('/export', 'NilaiController@export');
+            $router->get('/siswa-tp', 'NilaiController@getSiswaWithTP');
             $router->get('/{id}', 'NilaiController@show');
             $router->put('/{id}', 'NilaiController@update');
         });        
@@ -1094,3 +1096,8 @@ $router->post('/activity/heartbeat', [
     'middleware' => 'login',
     'uses' => 'ActivityController@heartbeat'
 ]);
+
+Route::group(['prefix' => 'admin', 'middleware' => ['auth:api', 'role:admin']], function () {
+    // ... existing routes ...
+    Route::get('/export-nilai', 'Admin\ReportController@exportNilai');
+});

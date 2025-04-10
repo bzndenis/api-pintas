@@ -308,6 +308,80 @@ class AbsensiController extends Controller
         }
     }
 
+    public function storeBatch(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $sekolahId = $user->sekolah_id;
+
+            $validator = Validator::make($request->all(), [
+                'absensi' => 'required|array',
+                'absensi.*.pertemuan_id' => 'required|string|exists:pertemuan_bulanan,id',
+                'absensi.*.siswa_id' => 'required|string|exists:siswa,id',
+                'absensi.*.hadir' => 'required|integer|min:0',
+                'absensi.*.izin' => 'required|integer|min:0',
+                'absensi.*.sakit' => 'required|integer|min:0',
+                'absensi.*.absen' => 'required|integer|min:0',
+                'absensi.*.keterangan' => 'nullable|string|max:255'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $absensiData = $request->input('absensi');
+            $absensiList = [];
+
+            foreach ($absensiData as $data) {
+                $exists = AbsensiSiswa::where('siswa_id', $data['siswa_id'])
+                            ->where('pertemuan_id', $data['pertemuan_id'])
+                            ->where('sekolah_id', $sekolahId)
+                            ->first();
+
+                if ($exists) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Data absensi untuk siswa dengan pertemuan_id ' . $data['pertemuan_id'] . ' sudah ada'
+                    ], 422);
+                }
+
+                $absensi = new AbsensiSiswa();
+                $absensi->id = Uuid::uuid4()->toString();
+                $absensi->siswa_id = $data['siswa_id'];
+                $absensi->pertemuan_id = $data['pertemuan_id'];
+                $absensi->hadir = $data['hadir'];
+                $absensi->izin = $data['izin'];
+                $absensi->sakit = $data['sakit'];
+                $absensi->absen = $data['absen'];
+                $absensi->keterangan = $data['keterangan'];
+                $absensi->created_by = $user->id;
+                $absensi->sekolah_id = $sekolahId;
+                $absensiList[] = $absensi;
+            }
+
+            foreach ($absensiList as $absensi) {
+                $absensi->save();
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data absensi batch berhasil disimpan',
+                'data' => $absensiList
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    
+
     /**
      * Memperbaharui data absensi siswa
      */

@@ -86,53 +86,46 @@ class ReportController extends BaseAdminController
     public function exportNilai(Request $request)
     {
         try {
-            // Validasi parameter yang diperlukan
+            // Validasi request
             $this->validate($request, [
-                'tahun_ajaran_id' => 'required|exists:tahun_ajaran,id',
                 'semester' => 'required|in:1,2',
-                'mapel_id' => 'required|exists:mata_pelajaran,id',
-                'kelas_id' => 'required|exists:kelas,id',
-                'siswa_id' => 'nullable|exists:siswa,id'
+                'mata_pelajaran_id' => 'required|exists:mata_pelajaran,id',
+                'kelas_id' => 'required|exists:kelas,id'
             ]);
-            
-            // Ambil data nilai berdasarkan filter
+
+            // Query data nilai
             $query = NilaiSiswa::with([
                 'siswa',
                 'tujuanPembelajaran.capaianPembelajaran.mataPelajaran'
-            ])->whereHas('siswa', function($q) {
-                $q->where('sekolah_id', Auth::user()->sekolah_id);
+            ])->whereHas('siswa', function($q) use ($request) {
+                $q->where('kelas_id', $request->kelas_id)
+                  ->where('sekolah_id', Auth::user()->sekolah_id);
+            })->whereHas('tujuanPembelajaran.capaianPembelajaran', function($q) use ($request) {
+                $q->where('mata_pelajaran_id', $request->mata_pelajaran_id);
             });
-            
-            // Filter berdasarkan tahun ajaran
-            $query->whereHas('siswa.kelas', function($q) use ($request) {
-                $q->where('tahun_ajaran_id', $request->tahun_ajaran_id);
-            });
-            
-            // Filter berdasarkan semester
-            $query->where('semester', $request->semester);
-            
-            // Filter berdasarkan mata pelajaran
-            $query->whereHas('tujuanPembelajaran.capaianPembelajaran', function($q) use ($request) {
-                $q->where('mata_pelajaran_id', $request->mapel_id);
-            });
-            
-            // Filter berdasarkan kelas
-            $query->whereHas('siswa', function($q) use ($request) {
-                $q->where('kelas_id', $request->kelas_id);
-            });
-            
-            // Filter berdasarkan siswa jika ada
-            if ($request->siswa_id) {
-                $query->where('siswa_id', $request->siswa_id);
+
+            // Filter semester
+            if ($request->semester) {
+                $query->where('semester', $request->semester);
             }
-            
-            $nilai = $query->get();
-            
-            // Ambil data pendukung
-            $tahunAjaran = TahunAjaran::find($request->tahun_ajaran_id);
-            $mapel = MataPelajaran::find($request->mapel_id);
-            $kelas = Kelas::find($request->kelas_id);
-            
+
+            $nilaiSiswa = $query->get()
+                ->groupBy('siswa_id')
+                ->map(function($nilai) {
+                    $siswa = $nilai->first()->siswa;
+                    $nilaiUrut = $nilai->sortBy('tujuanPembelajaran.kode_tp')->values();
+                    
+                    $data = [
+                        'nama' => $siswa->nama,
+                    ];
+                    
+                    foreach($nilaiUrut as $index => $n) {
+                        $data['S-'.($index+1)] = $n->nilai;
+                    }
+                    
+                    return $data;
+                })->values();
+
             // Buat spreadsheet baru
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
@@ -142,100 +135,48 @@ class ReportController extends BaseAdminController
             
             // Header laporan
             $sheet->setCellValue('A1', 'REKAP NILAI SISWA');
-            $sheet->setCellValue('A2', 'Tahun Ajaran: ' . $tahunAjaran->nama_tahun_ajaran);
-            $sheet->setCellValue('A3', 'Semester: ' . $request->semester);
-            $sheet->setCellValue('A4', 'Mata Pelajaran: ' . $mapel->nama_mapel);
-            $sheet->setCellValue('A5', 'Kelas: ' . $kelas->nama_kelas);
-            $sheet->setCellValue('A6', 'Tanggal: ' . date('d/m/Y'));
             
-            // Merge cells untuk header
-            $sheet->mergeCells('A1:G1');
-            $sheet->mergeCells('A2:G2');
-            $sheet->mergeCells('A3:G3');
-            $sheet->mergeCells('A4:G4');
-            $sheet->mergeCells('A5:G5');
-            $sheet->mergeCells('A6:G6');
+            // Ambil data pendukung
+            $kelas = Kelas::find($request->kelas_id);
+            $mapel = MataPelajaran::find($request->mata_pelajaran_id);
             
-            // Style untuk header
-            $headerStyle = [
-                'font' => [
-                    'bold' => true,
-                    'size' => 14
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
-            ];
-            
-            $sheet->getStyle('A1:G6')->applyFromArray($headerStyle);
+            $sheet->setCellValue('A2', 'Kelas: ' . $kelas->nama_kelas);
+            $sheet->setCellValue('A3', 'Mata Pelajaran: ' . $mapel->nama_mapel);
+            $sheet->setCellValue('A4', 'Semester: ' . $request->semester);
+            $sheet->setCellValue('A5', 'Tanggal: ' . date('d/m/Y'));
             
             // Header tabel
-            $sheet->setCellValue('A8', 'No');
-            $sheet->setCellValue('B8', 'NISN');
-            $sheet->setCellValue('C8', 'Nama Siswa');
-            $sheet->setCellValue('D8', 'Tujuan Pembelajaran');
-            $sheet->setCellValue('E8', 'Nilai');
-            $sheet->setCellValue('F8', 'Keterangan');
-            $sheet->setCellValue('G8', 'Tanggal');
+            $sheet->setCellValue('A7', 'No');
+            $sheet->setCellValue('B7', 'Nama Siswa');
             
-            // Style untuk header tabel
-            $tableHeaderStyle = [
-                'font' => [
-                    'bold' => true
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ],
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN
-                    ]
-                ],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => [
-                        'rgb' => 'E2EFDA'
-                    ]
-                ]
-            ];
-            
-            $sheet->getStyle('A8:G8')->applyFromArray($tableHeaderStyle);
-            
-            // Isi tabel
-            $row = 9;
-            $no = 1;
-            
-            foreach ($nilai as $item) {
-                $sheet->setCellValue('A' . $row, $no);
-                $sheet->setCellValue('B' . $row, $item->siswa->nisn);
-                $sheet->setCellValue('C' . $row, $item->siswa->nama);
-                $sheet->setCellValue('D' . $row, $item->tujuanPembelajaran->deskripsi);
-                $sheet->setCellValue('E' . $row, $item->nilai);
-                
-                // Tentukan keterangan berdasarkan nilai
-                if ($item->nilai >= 90) {
-                    $keterangan = 'Sangat Baik';
-                } elseif ($item->nilai >= 80) {
-                    $keterangan = 'Baik';
-                } elseif ($item->nilai >= 70) {
-                    $keterangan = 'Cukup';
-                } elseif ($item->nilai >= 60) {
-                    $keterangan = 'Kurang';
-                } else {
-                    $keterangan = 'Perlu Perbaikan';
-                }
-                
-                $sheet->setCellValue('F' . $row, $keterangan);
-                $sheet->setCellValue('G' . $row, Carbon::parse($item->created_at)->format('d/m/Y'));
-                
-                $row++;
-                $no++;
+            // Set header nilai (S1-S7)
+            $kolom = 'C';
+            for($i = 1; $i <= 7; $i++) {
+                $sheet->setCellValue($kolom.'7', 'S-'.$i);
+                $kolom++;
             }
             
-            // Style untuk isi tabel
-            $bodyStyle = [
+            // Isi data
+            $row = 8;
+            foreach($nilaiSiswa as $index => $nilai) {
+                $sheet->setCellValue('A'.$row, $index + 1);
+                $sheet->setCellValue('B'.$row, $nilai['nama']);
+                
+                $kolom = 'C';
+                for($i = 1; $i <= 7; $i++) {
+                    $nilaiCell = $nilai['S-'.$i] ?? '';
+                    $sheet->setCellValue($kolom.$row, $nilaiCell);
+                    $kolom++;
+                }
+                $row++;
+            }
+            
+            // Style tabel
+            $lastRow = $row - 1;
+            $lastColumn = 'I';
+            
+            // Border style
+            $borderStyle = [
                 'borders' => [
                     'allBorders' => [
                         'borderStyle' => Border::BORDER_THIN
@@ -243,36 +184,27 @@ class ReportController extends BaseAdminController
                 ]
             ];
             
-            $sheet->getStyle('A9:G' . ($row - 1))->applyFromArray($bodyStyle);
+            // Apply style ke tabel
+            $sheet->getStyle('A7:'.$lastColumn.$lastRow)->applyFromArray($borderStyle);
             
-            // Auto-size kolom
-            foreach (range('A', 'G') as $col) {
+            // Auto size columns
+            foreach(range('A', $lastColumn) as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
             
-            // Buat file Excel
+            // Center align header
+            $sheet->getStyle('A7:'.$lastColumn.'7')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            
+            // Set header untuk download
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment;filename="Rekap Nilai Siswa.xlsx"');
+            header('Cache-Control: max-age=0');
+            
+            // Create Excel file
             $writer = new Xlsx($spreadsheet);
-            $filename = 'Rekap_Nilai_' . $kelas->nama_kelas . '_' . $mapel->nama_mapel . '_' . date('Ymd_His') . '.xlsx';
+            $writer->save('php://output');
+            exit;
             
-            // Simpan langsung ke direktori public tanpa menggunakan symlink
-            $exportDir = 'exports';
-            $publicPath = base_path('public/' . $exportDir);
-            
-            // Pastikan direktori ada
-            if (!file_exists($publicPath)) {
-                mkdir($publicPath, 0777, true);
-            }
-            
-            $path = $publicPath . '/' . $filename;
-            $writer->save($path);
-            
-            // Kembalikan URL untuk download
-            $url = url($exportDir . '/' . $filename);
-            
-            return ResponseBuilder::success(200, "Berhasil mengekspor data nilai", [
-                'download_url' => $url,
-                'filename' => $filename
-            ]);
         } catch (\Exception $e) {
             return ResponseBuilder::error(500, "Gagal mengekspor data: " . $e->getMessage());
         }

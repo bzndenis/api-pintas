@@ -82,7 +82,7 @@ class CapaianPembelajaranController extends BaseGuruController
             }
 
             // Generate kode CP otomatis jika tidak diisi
-            if (!$request->kode_cp) {
+            if (empty($request->kode_cp)) {
                 $mapel = \App\Models\MataPelajaran::find($request->mapel_id);
                 $lastCP = CapaianPembelajaran::where('mapel_id', $request->mapel_id)
                     ->where('sekolah_id', $guru->sekolah_id)
@@ -94,12 +94,8 @@ class CapaianPembelajaranController extends BaseGuruController
                     $counter = intval($matches[1]) + 1;
                 }
 
-                $kodeMapel = $mapel ? strtoupper($mapel->nama) : 'MP';
-                $kodeMapel = preg_replace('/[^A-Z]/', '', $kodeMapel); // Ambil huruf kapital saja
-                if (empty($kodeMapel)) {
-                    $kodeMapel = 'MP';
-                }
-                $request->merge(['kode_cp' => $kodeMapel . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT)]);
+                $namaMapel = $mapel ? explode(' ', trim($mapel->nama))[0] : 'Unknown';
+                $request->merge(['kode_cp' => 'CP.' . ucfirst($namaMapel) . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT)]);
             }
             
             // Validasi kode CP unik per mapel dan sekolah
@@ -273,12 +269,8 @@ class CapaianPembelajaranController extends BaseGuruController
                             $counter = intval($matches[1]) + 1;
                         }
 
-                        $kodeMapel = $mapel ? strtoupper($mapel->nama) : 'MP';
-                        $kodeMapel = preg_replace('/[^A-Z]/', '', $kodeMapel); // Ambil huruf kapital saja
-                        if (empty($kodeMapel)) {
-                            $kodeMapel = 'MP';
-                        }
-                        $data['kode_cp'] = $kodeMapel . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+                        $namaMapel = $mapel ? explode(' ', trim($mapel->nama_mapel))[0] : 'Unknown';
+                        $data['kode_cp'] = 'CP.' . ucfirst($namaMapel) . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
                     }
                     
                     // Validasi kode CP unik per mapel dan sekolah
