@@ -85,9 +85,10 @@ class TujuanPembelajaranController extends BaseGuruController
 
             // Generate kode TP otomatis jika tidak diisi
             if (!$request->kode_tp) {
-                $lastTP = TujuanPembelajaran::where('cp_id', $request->cp_id)
+                $lastTP = TujuanPembelajaran::withTrashed()
+                    ->where('cp_id', $request->cp_id)
                     ->where('sekolah_id', $guru->sekolah_id)
-                    ->orderBy('created_at', 'desc')
+                    ->orderBy(DB::raw('CAST(SUBSTRING_INDEX(kode_tp, ".", -1) AS UNSIGNED)'), 'desc')
                     ->first();
 
                 $counter = 1;
@@ -99,7 +100,8 @@ class TujuanPembelajaranController extends BaseGuruController
             }
             
             // Validasi kode TP unik per CP dan sekolah
-            $existingTP = TujuanPembelajaran::where('kode_tp', $request->kode_tp)
+            $existingTP = TujuanPembelajaran::withTrashed()
+                ->where('kode_tp', $request->kode_tp)
                 ->where('cp_id', $request->cp_id)
                 ->where('sekolah_id', $guru->sekolah_id)
                 ->exists();
@@ -204,7 +206,7 @@ class TujuanPembelajaranController extends BaseGuruController
         $this->validate($request, [
             'data' => 'required|array|min:1',
             'data.*.deskripsi' => 'required|string',
-            'data.*.nama' => 'nullable|string|max:255',
+            'data.*.nama' => 'nullable|string|max:255', 
             'data.*.bobot' => 'required|numeric|min:0|max:100',
             'data.*.cp_id' => 'required|string|uuid|exists:capaian_pembelajaran,id',
             'data.*.kode_tp' => 'nullable|string|max:20'
@@ -219,107 +221,123 @@ class TujuanPembelajaranController extends BaseGuruController
             $errors = [];
             $imported = 0;
             
+            // Nonaktifkan foreign key check sementara
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
             DB::beginTransaction();
+
+            // Kelompokkan data berdasarkan cp_id
+            $groupedData = collect($tpData)->groupBy('cp_id');
             
-            foreach ($tpData as $index => $data) {
-                try {
-                    // Log data yang akan diproses
-                    \Log::info('Processing TP data: ', $data);
-                    
-                    // Validasi apakah guru memiliki akses ke capaian pembelajaran
-                    $cp = CapaianPembelajaran::whereHas('mataPelajaran', function($q) use ($guru) {
-                        $q->where('guru_id', $guru->id);
-                    })->find($data['cp_id']);
-                    
-                    if (!$cp) {
+            foreach ($groupedData as $cpId => $tpGroup) {
+                // Validasi apakah guru memiliki akses ke capaian pembelajaran
+                $cp = CapaianPembelajaran::whereHas('mataPelajaran', function($q) use ($guru) {
+                    $q->where('guru_id', $guru->id);
+                })->find($cpId);
+                
+                if (!$cp) {
+                    foreach ($tpGroup as $index => $data) {
                         $errors[] = [
                             'row' => $index + 1,
                             'kode_tp' => $data['kode_tp'] ?? 'Unknown',
-                            'error' => "Capaian pembelajaran tidak ditemukan"
+                            'error' => "Anda tidak memiliki akses untuk capaian pembelajaran dengan ID: " . $cpId
                         ];
-                        continue;
                     }
-                    
-                    // Generate kode TP otomatis jika tidak diisi
-                    if (empty($data['kode_tp'])) {
-                        $lastTP = TujuanPembelajaran::where('cp_id', $data['cp_id'])
-                            ->where('sekolah_id', $guru->sekolah_id)
-                            ->orderBy('created_at', 'desc')
-                            ->first();
+                    continue;
+                }
 
-                        $counter = 1;
-                        if ($lastTP && preg_match('/(\d+)$/', $lastTP->kode_tp, $matches)) {
-                            $counter = intval($matches[1]) + 1;
+                // Dapatkan kode TP terakhir untuk capaian pembelajaran ini
+                $lastTP = TujuanPembelajaran::withTrashed()
+                    ->where('cp_id', $cpId)
+                    ->where('sekolah_id', $guru->sekolah_id)
+                    ->orderBy(DB::raw('CAST(SUBSTRING_INDEX(kode_tp, ".", -1) AS UNSIGNED)'), 'desc')
+                    ->first();
+
+                $counter = 1;
+                if ($lastTP && preg_match('/(\d+)$/', $lastTP->kode_tp, $matches)) {
+                    $counter = intval($matches[1]) + 1;
+                }
+
+                $baseKodeTP = 'TP.' . $cp->kode_cp . '.';
+
+                // Dapatkan semua kode TP yang sudah ada untuk capaian pembelajaran ini
+                $existingCodes = TujuanPembelajaran::withTrashed()
+                    ->where('cp_id', $cpId)
+                    ->where('sekolah_id', $guru->sekolah_id)
+                    ->pluck('kode_tp')
+                    ->toArray();
+
+                foreach ($tpGroup as $index => $data) {
+                    try {
+                        $originalKodeTP = $data['kode_tp'] ?? null;
+                        $kodeTP = $originalKodeTP;
+
+                        // Jika kode TP tidak diisi atau sudah ada, generate kode baru
+                        if (empty($kodeTP) || in_array($kodeTP, $existingCodes)) {
+                            do {
+                                $kodeTP = $baseKodeTP . str_pad($counter++, 2, '0', STR_PAD_LEFT);
+                            } while (in_array($kodeTP, $existingCodes));
                         }
 
-                        $data['kode_tp'] = 'TP.' . $cp->kode_cp . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
-                    }
-                    
-                    // Validasi kode TP unik per CP dan sekolah
-                    $existingTP = TujuanPembelajaran::where('kode_tp', $data['kode_tp'])
-                        ->where('cp_id', $data['cp_id'])
-                        ->where('sekolah_id', $guru->sekolah_id)
-                        ->exists();
+                        // Tambahkan kode TP baru ke daftar yang sudah ada
+                        $existingCodes[] = $kodeTP;
+
+                        $tpId = (string) Str::uuid();
+                        $insertData = [
+                            'id' => $tpId,
+                            'kode_tp' => $kodeTP,
+                            'nama' => $data['nama'] ?? null,
+                            'deskripsi' => $data['deskripsi'],
+                            'bobot' => $data['bobot'],
+                            'cp_id' => $cpId,
+                            'sekolah_id' => $guru->sekolah_id,
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
                         
-                    if ($existingTP) {
+                        DB::table('tujuan_pembelajaran')->insert($insertData);
+                        
+                        \Log::info('Tujuan pembelajaran created with ID: ' . $tpId);
+                        
+                        $importedData[] = [
+                            'id' => $tpId,
+                            'kode_tp' => $kodeTP,
+                            'nama' => $data['nama'] ?? null,
+                            'deskripsi' => $data['deskripsi'],
+                            'bobot' => $data['bobot'],
+                            'cp_id' => $cpId
+                        ];
+                        
+                        $imported++;
+                    } catch (\Exception $e) {
+                        \Log::error('Error creating TP: ' . $e->getMessage());
+                        \Log::error('Stack trace: ' . $e->getTraceAsString());
                         $errors[] = [
                             'row' => $index + 1,
                             'kode_tp' => $data['kode_tp'] ?? 'Unknown',
-                            'error' => "Kode TP sudah digunakan untuk capaian pembelajaran ini"
+                            'error' => $e->getMessage()
                         ];
-                        continue;
                     }
-                    
-                    // Buat UUID untuk tujuan pembelajaran
-                    $tpId = (string) Str::uuid();
-                    
-                    // Buat data tujuan pembelajaran
-                    $insertData = [
-                        'id' => $tpId,
-                        'kode_tp' => $data['kode_tp'],
-                        'nama' => $data['nama'] ?? null,
-                        'deskripsi' => $data['deskripsi'],
-                        'bobot' => $data['bobot'],
-                        'cp_id' => $data['cp_id'],
-                        'sekolah_id' => $guru->sekolah_id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
-                    ];
-                    
-                    DB::table('tujuan_pembelajaran')->insert($insertData);
-                    
-                    \Log::info('Tujuan pembelajaran created with ID: ' . $tpId);
-                    
-                    $importedData[] = [
-                        'id' => $tpId,
-                        'kode_tp' => $data['kode_tp'],
-                        'nama' => $data['nama'] ?? null,
-                        'deskripsi' => $data['deskripsi'],
-                        'bobot' => $data['bobot'],
-                        'cp_id' => $data['cp_id']
-                    ];
-                    
-                    $imported++;
-                } catch (\Exception $e) {
-                    \Log::error('Error creating TP: ' . $e->getMessage());
-                    \Log::error('Stack trace: ' . $e->getTraceAsString());
-                    $errors[] = [
-                        'row' => $index + 1,
-                        'kode_tp' => $data['kode_tp'] ?? 'Unknown',
-                        'error' => $e->getMessage()
-                    ];
                 }
             }
             
             DB::commit();
+            // Aktifkan kembali foreign key check
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
             
-            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data tujuan pembelajaran", [
+            $message = "Berhasil menambahkan $imported data tujuan pembelajaran";
+            if (count($importedData) > 0 && count($errors) > 0) {
+                $message .= " dengan " . count($errors) . " data gagal";
+            }
+            
+            return ResponseBuilder::success(200, $message, [
                 'imported' => $imported,
                 'errors' => $errors,
                 'data' => $importedData
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            // Pastikan foreign key check diaktifkan kembali jika terjadi error
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
             
             \Log::error('Batch error: ' . $e->getMessage());
             \Log::error('Stack trace: ' . $e->getTraceAsString());

@@ -84,9 +84,10 @@ class CapaianPembelajaranController extends BaseGuruController
             // Generate kode CP otomatis jika tidak diisi
             if (empty($request->kode_cp)) {
                 $mapel = \App\Models\MataPelajaran::find($request->mapel_id);
-                $lastCP = CapaianPembelajaran::where('mapel_id', $request->mapel_id)
+                $lastCP = CapaianPembelajaran::withTrashed()
+                    ->where('mapel_id', $request->mapel_id)
                     ->where('sekolah_id', $guru->sekolah_id)
-                    ->orderBy('created_at', 'desc')
+                    ->orderBy(DB::raw('CAST(SUBSTRING_INDEX(kode_cp, ".", -1) AS UNSIGNED)'), 'desc')
                     ->first();
 
                 $counter = 1;
@@ -99,7 +100,8 @@ class CapaianPembelajaranController extends BaseGuruController
             }
             
             // Validasi kode CP unik per mapel dan sekolah
-            $existingCP = CapaianPembelajaran::where('kode_cp', $request->kode_cp)
+            $existingCP = CapaianPembelajaran::withTrashed()
+                ->where('kode_cp', $request->kode_cp)
                 ->where('mapel_id', $request->mapel_id)
                 ->where('sekolah_id', $guru->sekolah_id)
                 ->exists();
@@ -241,84 +243,105 @@ class CapaianPembelajaranController extends BaseGuruController
             // Nonaktifkan foreign key check sementara
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
             DB::beginTransaction();
-            
-            foreach ($cpData as $index => $data) {
-                try {
-                    // Log data yang akan diproses
-                    \Log::info('Processing CP data: ', $data);
-                    
-                    // Validasi apakah guru mengajar mata pelajaran ini
-                    $mapelCount = $guru->mataPelajaran()
-                        ->where('id', $data['mapel_id'])
-                        ->count();
-                        
-                    if ($mapelCount === 0) {
-                        throw new \Exception("Anda tidak memiliki akses untuk mata pelajaran dengan ID: " . $data['mapel_id']);
-                    }
-                    
-                    // Generate kode CP otomatis jika tidak diisi
-                    if (empty($data['kode_cp'])) {
-                        $mapel = \App\Models\MataPelajaran::find($data['mapel_id']);
-                        $lastCP = CapaianPembelajaran::where('mapel_id', $data['mapel_id'])
-                            ->where('sekolah_id', $guru->sekolah_id)
-                            ->orderBy('created_at', 'desc')
-                            ->first();
 
-                        $counter = 1;
-                        if ($lastCP && preg_match('/(\d+)$/', $lastCP->kode_cp, $matches)) {
-                            $counter = intval($matches[1]) + 1;
+            // Kelompokkan data berdasarkan mapel_id
+            $groupedData = collect($cpData)->groupBy('mapel_id');
+            
+            foreach ($groupedData as $mapelId => $cpGroup) {
+                // Validasi apakah guru mengajar mata pelajaran ini
+                $mapelCount = $guru->mataPelajaran()
+                    ->where('id', $mapelId)
+                    ->count();
+                    
+                if ($mapelCount === 0) {
+                    foreach ($cpGroup as $index => $data) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'kode_cp' => $data['kode_cp'] ?? 'Unknown',
+                            'error' => "Anda tidak memiliki akses untuk mata pelajaran dengan ID: " . $mapelId
+                        ];
+                    }
+                    continue;
+                }
+
+                // Dapatkan kode CP terakhir untuk mata pelajaran ini
+                $lastCP = CapaianPembelajaran::withTrashed()
+                    ->where('mapel_id', $mapelId)
+                    ->where('sekolah_id', $guru->sekolah_id)
+                    ->orderBy(DB::raw('CAST(SUBSTRING_INDEX(kode_cp, ".", -1) AS UNSIGNED)'), 'desc')
+                    ->first();
+
+                $counter = 1;
+                if ($lastCP && preg_match('/(\d+)$/', $lastCP->kode_cp, $matches)) {
+                    $counter = intval($matches[1]) + 1;
+                }
+
+                $mapel = \App\Models\MataPelajaran::find($mapelId);
+                $namaMapel = $mapel ? explode(' ', trim($mapel->nama_mapel))[0] : 'Unknown';
+                $baseKodeCP = 'CP.' . ucfirst($namaMapel) . '.';
+
+                // Dapatkan semua kode CP yang sudah ada untuk mata pelajaran ini
+                $existingCodes = CapaianPembelajaran::withTrashed()
+                    ->where('mapel_id', $mapelId)
+                    ->where('sekolah_id', $guru->sekolah_id)
+                    ->pluck('kode_cp')
+                    ->toArray();
+
+                foreach ($cpGroup as $index => $data) {
+                    try {
+                        $originalKodeCP = $data['kode_cp'] ?? null;
+                        $kodeCP = $originalKodeCP;
+
+                        // Jika kode CP tidak diisi atau sudah ada, generate kode baru
+                        if (empty($kodeCP)) {
+                            do {
+                                $kodeCP = $baseKodeCP . str_pad($counter++, 2, '0', STR_PAD_LEFT);
+                            } while (in_array($kodeCP, $existingCodes));
+                        } else {
+                            // Jika kode CP diisi manual, cek apakah sudah ada
+                            if (in_array($kodeCP, $existingCodes)) {
+                                throw new \Exception("Kode CP '$kodeCP' sudah digunakan untuk mata pelajaran ini");
+                            }
                         }
 
-                        $namaMapel = $mapel ? explode(' ', trim($mapel->nama_mapel))[0] : 'Unknown';
-                        $data['kode_cp'] = 'CP.' . ucfirst($namaMapel) . '.' . str_pad($counter, 2, '0', STR_PAD_LEFT);
-                    }
-                    
-                    // Validasi kode CP unik per mapel dan sekolah
-                    $existingCP = CapaianPembelajaran::where('kode_cp', $data['kode_cp'])
-                        ->where('mapel_id', $data['mapel_id'])
-                        ->where('sekolah_id', $guru->sekolah_id)
-                        ->exists();
+                        // Tambahkan kode CP baru ke daftar yang sudah ada
+                        $existingCodes[] = $kodeCP;
+
+                        $cpId = (string) Str::uuid();
+                        $insertData = [
+                            'id' => $cpId,
+                            'kode_cp' => $kodeCP,
+                            'nama' => $data['nama'] ?? null,
+                            'deskripsi' => $data['deskripsi'],
+                            'mapel_id' => $mapelId,
+                            'sekolah_id' => $guru->sekolah_id,
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
                         
-                    if ($existingCP) {
-                        throw new \Exception("Kode CP " . $data['kode_cp'] . " sudah digunakan untuk mata pelajaran ini");
+                        DB::table('capaian_pembelajaran')->insert($insertData);
+                        
+                        \Log::info('Capaian pembelajaran created with ID: ' . $cpId);
+                        
+                        $importedData[] = [
+                            'id' => $cpId,
+                            'kode_cp' => $kodeCP,
+                            'nama' => $data['nama'] ?? null,
+                            'deskripsi' => $data['deskripsi'],
+                            'mapel_id' => $mapelId,
+                            'original_kode_cp' => $originalKodeCP
+                        ];
+                        
+                        $imported++;
+                    } catch (\Exception $e) {
+                        \Log::error('Error creating CP: ' . $e->getMessage());
+                        \Log::error('Stack trace: ' . $e->getTraceAsString());
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'kode_cp' => $data['kode_cp'] ?? 'Unknown',
+                            'error' => $e->getMessage()
+                        ];
                     }
-                    
-                    // Buat UUID untuk capaian pembelajaran
-                    $cpId = (string) Str::uuid();
-                    
-                    // Buat data capaian pembelajaran langsung dengan DB::table
-                    $insertData = [
-                        'id' => $cpId,
-                        'kode_cp' => $data['kode_cp'],
-                        'nama' => $data['nama'] ?? null,
-                        'deskripsi' => $data['deskripsi'],
-                        'mapel_id' => $data['mapel_id'],
-                        'sekolah_id' => $guru->sekolah_id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
-                    ];
-                    
-                    DB::table('capaian_pembelajaran')->insert($insertData);
-                    
-                    \Log::info('Capaian pembelajaran created with ID: ' . $cpId);
-                    
-                    $importedData[] = [
-                        'id' => $cpId,
-                        'kode_cp' => $data['kode_cp'],
-                        'nama' => $data['nama'] ?? null,
-                        'deskripsi' => $data['deskripsi'],
-                        'mapel_id' => $data['mapel_id']
-                    ];
-                    
-                    $imported++;
-                } catch (\Exception $e) {
-                    \Log::error('Error creating CP: ' . $e->getMessage());
-                    \Log::error('Stack trace: ' . $e->getTraceAsString());
-                    $errors[] = [
-                        'row' => $index + 1,
-                        'kode_cp' => $data['kode_cp'] ?? 'Unknown',
-                        'error' => $e->getMessage()
-                    ];
                 }
             }
             
@@ -326,7 +349,12 @@ class CapaianPembelajaranController extends BaseGuruController
             // Aktifkan kembali foreign key check
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
             
-            return ResponseBuilder::success(200, "Berhasil menambahkan $imported data capaian pembelajaran", [
+            $message = "Berhasil menambahkan $imported data capaian pembelajaran";
+            if (count($importedData) > 0 && count($errors) > 0) {
+                $message .= " dengan " . count($errors) . " data gagal";
+            }
+            
+            return ResponseBuilder::success(200, $message, [
                 'imported' => $imported,
                 'errors' => $errors,
                 'data' => $importedData

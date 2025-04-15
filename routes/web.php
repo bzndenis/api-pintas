@@ -1088,6 +1088,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         $router->get('/statistics', 'UserActivityController@getActivityStatistics');
         $router->get('/usage-time', 'UserActivityController@getUsageTime');
         $router->get('/all-usage-time', 'UserActivityController@getAllUsageTime');
+        $router->get('/application-logs', 'UserActivityController@getApplicationLogs');
     });
 });
 

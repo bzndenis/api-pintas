@@ -500,4 +500,79 @@ class UserActivityController extends Controller
             return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
         }
     }
+
+    /**
+     * Mendapatkan log aplikasi terbaru
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function getApplicationLogs(Request $request)
+    {
+        try {
+            $sekolahId = $request->sekolah_id;
+            
+            // Ambil sesi aktif dan terakhir untuk setiap pengguna
+            $userSessions = DB::table('user_sessions as us')
+                ->join('users as u', 'us.user_id', '=', 'u.id')
+                ->select(
+                    'u.id',
+                    'u.fullname',
+                    'u.role',
+                    'us.login_time',
+                    'us.duration',
+                    'us.status'
+                )
+                ->where('u.sekolah_id', $sekolahId)
+                ->where(function($query) {
+                    $query->where('us.status', 'active')
+                          ->orWhere('us.status', 'expired');
+                })
+                ->orderBy('us.login_time', 'desc')
+                ->get()
+                ->groupBy('id');
+
+            $logs = [];
+            
+            foreach ($userSessions as $userId => $sessions) {
+                $latestSession = $sessions->first();
+                $now = Carbon::now();
+                $loginTime = Carbon::parse($latestSession->login_time);
+                
+                // Hitung waktu sejak login terakhir
+                $timeSinceLogin = $loginTime->diffForHumans(['parts' => 1, 'short' => true]);
+                
+                // Hitung durasi di aplikasi
+                $durationMinutes = 0;
+                if ($latestSession->status === 'active') {
+                    $durationMinutes = $now->diffInMinutes($loginTime);
+                } else {
+                    $durationMinutes = floor($latestSession->duration / 60);
+                }
+                
+                // Format nama pengguna
+                $displayName = $latestSession->role === 'admin' ? 'Admin' : $latestSession->fullname;
+                
+                $logs[] = [
+                    'user_name' => $displayName,
+                    'last_login' => $timeSinceLogin . ' yang lalu',
+                    'duration' => $durationMinutes . ' menit waktu di aplikasi'
+                ];
+            }
+            
+            // Urutkan berdasarkan login terbaru
+            usort($logs, function($a, $b) {
+                return strcmp($b['last_login'], $a['last_login']);
+            });
+
+            return ResponseBuilder::success(200, "Berhasil mendapatkan log aplikasi", [
+                'logs' => $logs
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Gagal mengambil log aplikasi: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return ResponseBuilder::error(500, "Gagal mengambil data: " . $e->getMessage());
+        }
+    }
 } 
