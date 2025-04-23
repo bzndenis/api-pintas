@@ -14,6 +14,7 @@ use Ramsey\Uuid\Uuid;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class AbsensiController extends Controller
 {
@@ -104,6 +105,7 @@ class AbsensiController extends Controller
 
             // Cek apakah sudah ada pertemuan untuk bulan dan kelas yang sama
             $exists = PertemuanBulanan::where('kelas_id', $request->kelas_id)
+                        ->where('mata_pelajaran_id', $request->mata_pelajaran_id)
                         ->where('bulan', $request->bulan)
                         ->where('tahun', $request->tahun)
                         ->where('sekolah_id', $sekolahId)
@@ -112,7 +114,7 @@ class AbsensiController extends Controller
             if ($exists) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Pertemuan untuk bulan ini sudah ada'
+                    'message' => 'Pertemuan untuk mata pelajaran dan bulan ini sudah ada'
                 ], 422);
             }
 
@@ -494,6 +496,206 @@ class AbsensiController extends Controller
                 'kelas' => $kelas ? ['id' => $kelas->id, 'nama' => $kelas->nama_kelas, 'tingkat' => $kelas->tingkat] : null
             ]);
         } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $user = Auth::user();
+            $sekolahId = $user->sekolah_id;
+            $userId = $user->id;
+
+            // Log untuk debugging user
+            \Log::info('User yang mencoba menghapus:', [
+                'user_id' => $userId,
+                'sekolah_id_user' => $sekolahId
+            ]);
+
+            // Tambahkan log untuk debugging
+            $dataAbsensi = DB::table('absensi_siswa')
+                            ->where('id', $id)
+                            ->first(); // Hapus where sekolah_id dulu untuk debug
+                            
+            \Log::info('Data absensi yang akan dihapus:', [
+                'id' => $id,
+                'data' => $dataAbsensi,
+                'sekolah_id_data' => $dataAbsensi ? $dataAbsensi->sekolah_id : null
+            ]);
+
+            // Cek kecocokan sekolah_id
+            if ($dataAbsensi && $dataAbsensi->sekolah_id !== $sekolahId) {
+                \Log::warning('Sekolah ID tidak cocok:', [
+                    'sekolah_id_user' => $sekolahId,
+                    'sekolah_id_data' => $dataAbsensi->sekolah_id
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Anda tidak memiliki akses untuk menghapus data ini'
+                ], 403);
+            }
+
+            if (!$dataAbsensi) {
+                \Log::warning('Data absensi tidak ditemukan:', [
+                    'id' => $id
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data absensi tidak ditemukan'
+                ], 404);
+            }
+
+            // Hapus data absensi
+            $deleted = DB::table('absensi_siswa')
+                        ->where('id', $id)
+                        ->where('sekolah_id', $sekolahId)
+                        ->delete();
+
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal menghapus data absensi'
+                ], 500);
+            }
+
+            // Catat aktivitas penghapusan di user_activities
+            DB::table('user_activities')->insert([
+                'id' => Uuid::uuid4()->toString(),
+                'user_id' => $userId,
+                'action' => 'delete_absensi',
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'duration' => 0,
+                'sekolah_id' => $sekolahId,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data absensi berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error saat menghapus absensi:', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Menghapus data pertemuan bulanan beserta data absensi terkait
+     */
+    public function destroyMonth($id)
+    {
+        try {
+            $user = Auth::user();
+            $sekolahId = $user->sekolah_id;
+            $userId = $user->id;
+
+            // Log untuk debugging
+            \Log::info('User yang mencoba menghapus pertemuan bulanan:', [
+                'user_id' => $userId,
+                'sekolah_id_user' => $sekolahId,
+                'id_pertemuan' => $id
+            ]);
+
+            // Cek data pertemuan bulanan tanpa filter sekolah_id dulu
+            $pertemuanRaw = PertemuanBulanan::where('id', $id)->first();
+            
+            if ($pertemuanRaw) {
+                if ($pertemuanRaw->sekolah_id !== $sekolahId) {
+                    \Log::warning('Sekolah ID tidak cocok:', [
+                        'sekolah_id_user' => $sekolahId,
+                        'sekolah_id_data' => $pertemuanRaw->sekolah_id
+                    ]);
+                    
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Anda tidak memiliki akses untuk menghapus data ini. Sekolah ID tidak sesuai.',
+                        'debug_info' => [
+                            'sekolah_id_user' => $sekolahId,
+                            'sekolah_id_data' => $pertemuanRaw->sekolah_id
+                        ]
+                    ], 403);
+                }
+            }
+
+            // Cek data pertemuan bulanan dengan filter sekolah_id
+            $pertemuan = PertemuanBulanan::where('id', $id)
+                            ->where('sekolah_id', $sekolahId)
+                            ->first();
+
+            \Log::info('Query result:', [
+                'pertemuan_found' => $pertemuan ? true : false,
+                'raw_query' => PertemuanBulanan::where('id', $id)
+                            ->where('sekolah_id', $sekolahId)
+                            ->toSql(),
+                'bindings' => [
+                    'id' => $id,
+                    'sekolah_id' => $sekolahId
+                ]
+            ]);
+
+            if (!$pertemuan) {
+                \Log::warning('Data pertemuan bulanan tidak ditemukan:', [
+                    'id' => $id
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data pertemuan bulanan tidak ditemukan'
+                ], 404);
+            }
+
+            // Hapus pertemuan bulanan (akan otomatis menghapus absensi terkait karena foreign key constraint)
+            $deleted = $pertemuan->delete();
+
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal menghapus data pertemuan bulanan'
+                ], 500);
+            }
+
+            // Catat aktivitas penghapusan di user_activities
+            DB::table('user_activities')->insert([
+                'id' => Uuid::uuid4()->toString(),
+                'user_id' => $userId,
+                'action' => 'delete_pertemuan_bulanan',
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'duration' => 0,
+                'sekolah_id' => $sekolahId,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data pertemuan bulanan berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error saat menghapus pertemuan bulanan:', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()

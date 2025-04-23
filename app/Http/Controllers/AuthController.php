@@ -66,7 +66,7 @@ class AuthController extends Controller
                 'role' => 'admin',
                 'sekolah_id' => $sekolahId,
                 'username' => strtolower(str_replace(' ', '', $request->input('username'))),
-                'fullname' => $request->input('username'),
+                'fullname' => $request->input('fullname'),
                 'is_active' => 1,
                 'created_at' => \Carbon\Carbon::now(),
                 'updated_at' => \Carbon\Carbon::now()

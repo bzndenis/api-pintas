@@ -1002,6 +1002,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         // Laporan
         $router->get('/reports/nilai', 'Admin\ReportController@nilai');
         $router->get('/reports/nilai/export', 'Admin\ReportController@exportNilai');
+        $router->get('/reports/nilai/dropdown', 'Admin\ReportController@getDropdownData');
         $router->get('/reports/absensi', 'Admin\ReportController@absensi');
         $router->get('/reports/aktivitas', 'Admin\ReportController@aktivitas');
 
@@ -1054,6 +1055,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
         // Presensi Bulanan
         $router->group(['prefix' => 'absensi'], function () use ($router) {
             $router->get('/', 'AbsensiController@index');
+            $router->delete('/{id}', 'AbsensiController@destroy');
             $router->post('/bulan', 'AbsensiController@createMonth');
             $router->get('/bulan/{id}', 'AbsensiController@getMonthDetail');
             $router->get('/bulan/{id}/siswa', 'AbsensiController@getStudentsByMonth');
@@ -1061,6 +1063,7 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->post('/siswa/batch', 'AbsensiController@storeBatch');
             $router->put('/siswa/{id}', 'AbsensiController@updateStudentAttendance');
             $router->get('/rekap', 'AbsensiController@summary');
+            $router->delete('/bulan/{id}', 'AbsensiController@destroyMonth');
         });
         
         // Penilaian Siswa
@@ -1071,12 +1074,14 @@ $router->group(['middleware' => ['login', 'activity.tracker']], function () use 
             $router->get('/template', 'NilaiController@getTemplate');
             $router->post('/import', 'NilaiController@import');
             $router->get('/rekap', 'RekapController@nilai');
-            $router->get('/export', 'NilaiController@export');
+            $router->get('/export', 'ReportController@exportNilai');
             $router->get('/siswa-tp', 'NilaiController@getSiswaWithTP');
             $router->get('/{id}', 'NilaiController@show');
             $router->put('/{id}', 'NilaiController@update');
-        });        
+        });
         
+        $router->delete('guru/absensi/{id}', ['uses' => 'Guru\AbsensiController@destroy']);
+        $router->delete('guru/absensi/bulan/{id}', ['uses' => 'Guru\AbsensiController@destroyMonth']);
     });
 
     // User Activity Routes
@@ -1097,8 +1102,3 @@ $router->post('/activity/heartbeat', [
     'middleware' => 'login',
     'uses' => 'ActivityController@heartbeat'
 ]);
-
-Route::group(['prefix' => 'admin', 'middleware' => ['auth:api', 'role:admin']], function () {
-    // ... existing routes ...
-    Route::get('/export-nilai', 'Admin\ReportController@exportNilai');
-});

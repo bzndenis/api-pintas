@@ -10,6 +10,8 @@ return [
         'api' => [
             'driver' => 'token',
             'provider' => 'users',
+            'storage_key' => 'remember_token',
+            'hash' => false,
         ],
     ],
 

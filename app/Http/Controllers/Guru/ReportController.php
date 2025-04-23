@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Guru;
 
 use App\Models\NilaiSiswa;
 use App\Models\AbsensiSiswa;
@@ -20,8 +20,10 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Carbon\Carbon;
 use App\Models\CapaianPembelajaran;
 use App\Models\TujuanPembelajaran;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 
-class ReportController extends BaseAdminController
+class ReportController extends Controller
 {
     public function nilai(Request $request)
     {
@@ -88,95 +90,127 @@ class ReportController extends BaseAdminController
     public function exportNilai(Request $request)
     {
         try {
-            // Ambil parameter dari query atau body
             $mapel_id = $request->query('mata_pelajaran_id') ?? $request->input('mata_pelajaran_id');
-            $kelas_id = $request->query('kelas_id') ?? $request->input('kelas_id');
+            $guru = Auth::user()->guru;
 
-            // Validasi parameter
+            // Debug Step 1: Cek parameter awal
+            \Log::info('Debug Step 1 - Initial Parameters:', [
+                'mapel_id' => $mapel_id,
+                'guru_id' => $guru->id ?? null
+            ]);
+
             if (empty($mapel_id)) {
                 return ResponseBuilder::error(400, "Parameter mata_pelajaran_id harus diisi");
             }
-            if (empty($kelas_id)) {
-                return ResponseBuilder::error(400, "Parameter kelas_id harus diisi");
+
+            if (!$guru) {
+                return ResponseBuilder::error(403, "Akses ditolak. Anda bukan guru");
             }
 
-            // Validasi existence di database
-            $mapel = MataPelajaran::find($mapel_id);
-            if (!$mapel) {
-                return ResponseBuilder::error(404, "Mata pelajaran tidak ditemukan");
-            }
-
-            $kelas = Kelas::find($kelas_id);
-            if (!$kelas) {
-                return ResponseBuilder::error(404, "Kelas tidak ditemukan");
-            }
-
-            // Debug: Log data awal
-            \Log::info('Initial Data Check:', [
-                'mapel' => $mapel->toArray(),
-                'kelas' => $kelas->toArray(),
-                'user_sekolah_id' => Auth::user()->sekolah_id
+            // Debug Step 2: Cek Mata Pelajaran
+            $mapel = MataPelajaran::where('id', $mapel_id)
+                ->where('guru_id', $guru->id)
+                ->first();
+            
+            \Log::info('Debug Step 2 - Mata Pelajaran Check:', [
+                'mapel_exists' => !is_null($mapel),
+                'mapel_data' => $mapel ? $mapel->toArray() : null,
+                'query' => [
+                    'mapel_id' => $mapel_id,
+                    'guru_id' => $guru->id
+                ]
             ]);
 
-            // Check related data
-            $siswaCount = Siswa::where('kelas_id', $kelas_id)
+            if (!$mapel) {
+                return ResponseBuilder::error(404, "Mata pelajaran tidak ditemukan atau Anda tidak mengajar mata pelajaran ini");
+            }
+
+            // Debug Step 3: Cek Kelas (Menggunakan pendekatan baru)
+            // Ambil kelas dari siswa yang memiliki nilai untuk mata pelajaran ini
+            $kelasQuery = Kelas::whereHas('siswa.nilaiSiswa.tujuanPembelajaran.capaianPembelajaran', function($q) use ($mapel_id) {
+                $q->where('mapel_id', $mapel_id);
+            })
+            ->where('sekolah_id', Auth::user()->sekolah_id)
+            ->whereNull('deleted_at');
+
+            // Debug query kelas
+            \Log::info('Debug Step 3 - Kelas Query:', [
+                'sql' => $kelasQuery->toSql(),
+                'bindings' => $kelasQuery->getBindings()
+            ]);
+
+            $kelas = $kelasQuery->first();
+
+            \Log::info('Debug Step 3 - Kelas Result:', [
+                'kelas_exists' => !is_null($kelas),
+                'kelas_data' => $kelas ? $kelas->toArray() : null
+            ]);
+
+            if (!$kelas) {
+                // Debug tambahan untuk cek data
+                $debugData = DB::select("
+                    SELECT DISTINCT k.id as kelas_id, k.nama_kelas 
+                    FROM kelas k
+                    JOIN siswa s ON s.kelas_id = k.id
+                    JOIN nilai_siswa ns ON ns.siswa_id = s.id
+                    JOIN tujuan_pembelajaran tp ON ns.tp_id = tp.id
+                    JOIN capaian_pembelajaran cp ON tp.cp_id = cp.id
+                    WHERE cp.mapel_id = ?
+                    AND k.sekolah_id = ?
+                ", [$mapel_id, Auth::user()->sekolah_id]);
+
+                \Log::info('Debug Step 3.1 - Check Data:', [
+                    'data_exists' => !empty($debugData),
+                    'data' => $debugData
+                ]);
+
+                return ResponseBuilder::error(404, "Tidak ditemukan kelas yang memiliki nilai untuk mata pelajaran ini");
+            }
+
+            // Debug Step 4: Cek Data Terkait
+            $siswaCount = Siswa::where('kelas_id', $kelas->id)
                 ->where('sekolah_id', Auth::user()->sekolah_id)
                 ->count();
             
-            $cpCount = CapaianPembelajaran::where('mapel_id', $mapel_id)
-                ->count();
+            $cp = CapaianPembelajaran::where('mapel_id', $mapel_id)->get();
+            $cpIds = $cp->pluck('id');
             
-            $tpIds = TujuanPembelajaran::whereHas('capaianPembelajaran', function($q) use ($mapel_id) {
-                $q->where('mapel_id', $mapel_id);
-            })->pluck('id');
+            $tp = TujuanPembelajaran::whereIn('cp_id', $cpIds)->get();
+            $tpIds = $tp->pluck('id');
 
-            // Debug: Log related data counts
-            \Log::info('Related Data Counts:', [
-                'siswa_in_kelas' => $siswaCount,
-                'cp_for_mapel' => $cpCount,
-                'tp_count' => count($tpIds),
+            \Log::info('Debug Step 4 - Related Data:', [
+                'siswa_count' => $siswaCount,
+                'cp_count' => $cp->count(),
+                'cp_ids' => $cpIds,
+                'tp_count' => $tp->count(),
                 'tp_ids' => $tpIds
             ]);
 
-            // Query data nilai with debug info
+            // Debug Step 5: Cek Nilai
             $nilaiQuery = NilaiSiswa::with([
                 'siswa',
                 'tujuanPembelajaran.capaianPembelajaran'
-            ])->whereHas('siswa', function($q) use ($kelas_id, $mapel_id) {
-                $q->where('kelas_id', $kelas_id);
+            ])->whereHas('siswa', function($q) use ($kelas) {
+                $q->where('kelas_id', $kelas->id);
             })->whereHas('tujuanPembelajaran', function($q) use ($mapel_id) {
                 $q->whereHas('capaianPembelajaran', function($q) use ($mapel_id) {
                     $q->where('mapel_id', $mapel_id);
                 });
             });
 
-            // Debug: Log the query
-            \Log::info('Nilai Query:', [
+            \Log::info('Debug Step 5 - Nilai Query:', [
                 'sql' => $nilaiQuery->toSql(),
-                'bindings' => $nilaiQuery->getBindings(),
-                'kelas_id' => $kelas_id,
-                'mapel_id' => $mapel_id
+                'bindings' => $nilaiQuery->getBindings()
             ]);
 
             $nilaiSiswa = $nilaiQuery->get();
 
-            // Debug: Log query results
-            \Log::info('Query Results:', [
-                'count' => $nilaiSiswa->count(),
+            \Log::info('Debug Step 5 - Nilai Results:', [
+                'nilai_count' => $nilaiSiswa->count(),
                 'first_few_records' => $nilaiSiswa->take(3)->toArray()
             ]);
 
             if ($nilaiSiswa->isEmpty()) {
-                // Debug: Log detailed error info
-                \Log::error('No Data Found:', [
-                    'kelas_id' => $kelas_id,
-                    'mapel_id' => $mapel_id,
-                    'sekolah_id' => Auth::user()->sekolah_id,
-                    'siswa_count' => $siswaCount,
-                    'cp_count' => $cpCount,
-                    'tp_count' => count($tpIds)
-                ]);
-
                 // Coba query langsung seperti di SQL
                 $rawNilai = \DB::select("
                     SELECT * FROM nilai_siswa 
@@ -190,7 +224,7 @@ class ReportController extends BaseAdminController
                             WHERE mapel_id = ?
                         )
                     )
-                ", [$kelas_id, $mapel_id]);
+                ", [$kelas->id, $mapel_id]);
 
                 if (empty($rawNilai)) {
                     return ResponseBuilder::error(404, "Tidak ada data nilai untuk kelas dan mata pelajaran yang dipilih. Pastikan: \n1. Ada siswa di kelas tersebut \n2. Ada capaian pembelajaran untuk mata pelajaran \n3. Ada tujuan pembelajaran \n4. Ada nilai yang sudah diinput");
@@ -207,6 +241,7 @@ class ReportController extends BaseAdminController
                     })->values();
             }
 
+            // Proses data nilai
             $nilaiSiswa = $nilaiSiswa->groupBy('siswa_id')
                 ->map(function($nilai) {
                     $siswa = $nilai->first()->siswa;

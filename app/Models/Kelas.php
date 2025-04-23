@@ -86,13 +86,6 @@ class Kelas extends Model
      */
     public function mataPelajaran()
     {
-        return $this->hasManyThrough(
-            MataPelajaran::class,
-            Pertemuan::class,
-            'kelas_id',
-            'id',
-            'id',
-            'mata_pelajaran_id'
-        );
+        return $this->belongsToMany(MataPelajaran::class, 'pertemuan', 'kelas_id', 'mata_pelajaran_id');
     }
 } 

@@ -10,6 +10,6 @@ class BaseAdminController extends Controller
     {
         $this->middleware('login');
         $this->middleware('admin');
-        $this->middleware('auto.logout:15');
+        $this->middleware('autologout:15');
     }
 } 

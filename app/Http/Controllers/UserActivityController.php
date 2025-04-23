@@ -511,17 +511,23 @@ class UserActivityController extends Controller
     {
         try {
             $sekolahId = $request->sekolah_id;
+            $idleTimeout = 5; // Timeout dalam menit
             
-            // Ambil sesi aktif dan terakhir untuk setiap pengguna
+            // Ambil sesi aktif dan terakhir untuk setiap pengguna beserta aktivitasnya
             $userSessions = DB::table('user_sessions as us')
                 ->join('users as u', 'us.user_id', '=', 'u.id')
+                ->leftJoin('user_activities as ua', function($join) {
+                    $join->on('ua.user_id', '=', 'us.user_id')
+                         ->whereRaw('ua.created_at >= us.login_time');
+                })
                 ->select(
                     'u.id',
                     'u.fullname',
                     'u.role',
                     'us.login_time',
                     'us.duration',
-                    'us.status'
+                    'us.status',
+                    'ua.created_at as activity_time'
                 )
                 ->where('u.sekolah_id', $sekolahId)
                 ->where(function($query) {
@@ -529,6 +535,7 @@ class UserActivityController extends Controller
                           ->orWhere('us.status', 'expired');
                 })
                 ->orderBy('us.login_time', 'desc')
+                ->orderBy('ua.created_at', 'asc')
                 ->get()
                 ->groupBy('id');
 
@@ -542,12 +549,44 @@ class UserActivityController extends Controller
                 // Hitung waktu sejak login terakhir
                 $timeSinceLogin = $loginTime->diffForHumans(['parts' => 1, 'short' => true]);
                 
-                // Hitung durasi di aplikasi
+                // Hitung durasi aktif di aplikasi
                 $durationMinutes = 0;
+                $lastActivityTime = $loginTime;
+                
                 if ($latestSession->status === 'active') {
-                    $durationMinutes = $now->diffInMinutes($loginTime);
+                    // Untuk sesi aktif, periksa aktivitas
+                    foreach ($sessions as $activity) {
+                        if ($activity->activity_time) {
+                            $activityTime = Carbon::parse($activity->activity_time);
+                            $timeDiff = $activityTime->diffInMinutes($lastActivityTime);
+                            
+                            // Jika perbedaan waktu kurang dari idle timeout, tambahkan ke durasi
+                            if ($timeDiff < $idleTimeout) {
+                                $durationMinutes += $timeDiff;
+                            }
+                            $lastActivityTime = $activityTime;
+                        }
+                    }
+                    
+                    // Cek aktivitas terakhir dengan waktu sekarang
+                    $finalTimeDiff = $now->diffInMinutes($lastActivityTime);
+                    if ($finalTimeDiff < $idleTimeout) {
+                        $durationMinutes += $finalTimeDiff;
+                    }
                 } else {
-                    $durationMinutes = floor($latestSession->duration / 60);
+                    // Untuk sesi yang sudah berakhir, gunakan durasi yang tersimpan
+                    // dengan mempertimbangkan aktivitas
+                    foreach ($sessions as $activity) {
+                        if ($activity->activity_time) {
+                            $activityTime = Carbon::parse($activity->activity_time);
+                            $timeDiff = $activityTime->diffInMinutes($lastActivityTime);
+                            
+                            if ($timeDiff < $idleTimeout) {
+                                $durationMinutes += $timeDiff;
+                            }
+                            $lastActivityTime = $activityTime;
+                        }
+                    }
                 }
                 
                 // Format nama pengguna
