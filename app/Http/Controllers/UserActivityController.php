@@ -33,44 +33,60 @@ class UserActivityController extends Controller
             $page = $request->input('page', 1);
             $offset = ($page - 1) * $limit;
             
-            $query = UserActivity::with(['user', 'sekolah']);
+            // Query menggunakan DB builder seperti getAllUsageTime
+            $query = DB::table('user_activities as ua')
+                ->join('users as u', 'ua.user_id', '=', 'u.id')
+                ->join('sekolah as s', 'ua.sekolah_id', '=', 's.id')
+                ->select(
+                    'ua.id',
+                    'ua.action',
+                    'ua.ip_address',
+                    'ua.user_agent',
+                    'ua.created_at',
+                    'u.id as user_id',
+                    'u.fullname',
+                    'u.email',
+                    'u.role',
+                    's.id as sekolah_id',
+                    's.nama_sekolah'
+                );
             
             if ($request->input('user_id_filter')) {
-                $query->where('user_id', $request->input('user_id_filter'));
+                $query->where('ua.user_id', $request->input('user_id_filter'));
             }
             
             if ($request->input('start_date') && $request->input('end_date')) {
-                $query->whereBetween('created_at', [
+                $query->whereBetween('ua.created_at', [
                     $request->input('start_date') . ' 00:00:00', 
                     $request->input('end_date') . ' 23:59:59'
                 ]);
             }
             
-            $query->where('sekolah_id', $sekolahId);
+            $query->where('ua.sekolah_id', $sekolahId);
             
             $total = $query->count();
             
-            $activities = $query->orderBy('created_at', 'desc')
+            $activities = $query->orderBy('ua.created_at', 'desc')
                 ->limit($limit)
                 ->offset($offset)
                 ->get();
 
-            $formattedActivities = $activities->map(function($activity) {
+            $formattedActivities = collect($activities)->map(function($activity) {
                 return [
                     'id' => $activity->id,
                     'user' => [
-                        'id' => $activity->user->id,
-                        'nama_lengkap' => $activity->user->nama_lengkap,
-                        'email' => $activity->user->email,
-                        'role' => $activity->user->role
+                        'id' => $activity->user_id,
+                        'nama_lengkap' => $activity->fullname ?: $activity->email,
+                        'email' => $activity->email,
+                        'role' => $activity->role
                     ],
                     'action' => $activity->action,
                     'ip_address' => $activity->ip_address,
                     'user_agent' => $activity->user_agent,
-                    'created_at' => $activity->created_at->format('Y-m-d H:i:s'),
+                    'created_at' => Carbon::parse($activity->created_at)->format('Y-m-d H:i:s'),
                     'sekolah' => [
-                        'id' => $activity->sekolah->id,
-                        'nama_sekolah' => $activity->sekolah->nama_sekolah
+                        'id' => $activity->sekolah_id,
+                        'nama_sekolah' => $activity->nama_sekolah
                     ]
                 ];
             });
@@ -136,7 +152,7 @@ class UserActivityController extends Controller
                     'id' => $session->id,
                     'user' => [
                         'id' => $session->user->id,
-                        'nama_lengkap' => $session->user->nama_lengkap,
+                        'nama_lengkap' => $session->user->fullname ?? $session->user->email ?? 'Unknown User',
                         'email' => $session->user->email,
                         'role' => $session->user->role
                     ],
@@ -474,7 +490,7 @@ class UserActivityController extends Controller
                 
                 return [
                     'id' => $user->id,
-                    'nama_lengkap' => $user->nama_lengkap,
+                    'nama_lengkap' => $user->nama_lengkap ?? $user->email ?? 'Unknown User',
                     'email' => $user->email,
                     'role' => $user->role,
                     'total_duration_seconds' => $totalSeconds,
@@ -590,7 +606,7 @@ class UserActivityController extends Controller
                 }
                 
                 // Format nama pengguna
-                $displayName = $latestSession->role === 'admin' ? 'Admin' : $latestSession->fullname;
+                $displayName = $latestSession->role === 'admin' ? 'Admin' : ($latestSession->fullname ?? $latestSession->email ?? 'Unknown User');
                 
                 $logs[] = [
                     'user_name' => $displayName,

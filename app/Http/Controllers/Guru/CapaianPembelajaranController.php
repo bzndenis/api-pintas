@@ -204,17 +204,15 @@ class CapaianPembelajaranController extends BaseGuruController
             
             DB::beginTransaction();
             
-            // Cek apakah capaian pembelajaran masih digunakan oleh tujuan pembelajaran
-            if ($cp->tujuanPembelajaran()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus capaian pembelajaran yang masih memiliki tujuan pembelajaran");
-            }
+            // Hapus semua tujuan pembelajaran terkait
+            $cp->tujuanPembelajaran()->delete();
             
             // Hapus capaian pembelajaran
             $cp->delete();
             
             DB::commit();
             
-            return ResponseBuilder::success(200, "Berhasil menghapus data capaian pembelajaran");
+            return ResponseBuilder::success(200, "Berhasil menghapus data capaian pembelajaran beserta tujuan pembelajarannya");
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());

@@ -66,6 +66,15 @@ class KelasController extends BaseAdminController
             if ($existingKelas) {
                 return ResponseBuilder::error(400, "Kelas dengan nama, tingkat, dan tahun yang sama sudah ada");
             }
+            
+            // Validasi bahwa guru belum mengajar kelas lain
+            $guruMengajarKelas = Kelas::where('guru_id', $data['guru_id'])
+                ->where('sekolah_id', $admin->sekolah_id)
+                ->exists();
+                
+            if ($guruMengajarKelas) {
+                return ResponseBuilder::error(400, "Guru ini sudah menjadi wali kelas untuk kelas lain");
+            }
 
             $kelas = Kelas::create($data);
 
@@ -104,6 +113,18 @@ class KelasController extends BaseAdminController
 
             if ($existingKelas) {
                 return ResponseBuilder::error(400, "Kelas dengan nama, tingkat, dan tahun yang sama sudah ada");
+            }
+            
+            // Jika guru_id berubah, cek apakah guru baru sudah mengajar kelas lain
+            if ($kelas->guru_id != $data['guru_id']) {
+                $guruMengajarKelas = Kelas::where('guru_id', $data['guru_id'])
+                    ->where('sekolah_id', $admin->sekolah_id)
+                    ->where('id', '!=', $id)
+                    ->exists();
+                    
+                if ($guruMengajarKelas) {
+                    return ResponseBuilder::error(400, "Guru ini sudah menjadi wali kelas untuk kelas lain");
+                }
             }
 
             $kelas->update($data);
@@ -171,6 +192,16 @@ class KelasController extends BaseAdminController
 
             if (!$guru) {
                 return ResponseBuilder::error(404, "Guru tidak ditemukan");
+            }
+            
+            // Validasi bahwa guru belum mengajar kelas lain (selain kelas ini)
+            $guruMengajarKelas = Kelas::where('guru_id', $request->guru_id)
+                ->where('sekolah_id', Auth::user()->sekolah_id)
+                ->where('id', '!=', $id)
+                ->exists();
+                
+            if ($guruMengajarKelas) {
+                return ResponseBuilder::error(400, "Guru ini sudah menjadi wali kelas untuk kelas lain");
             }
 
             $kelas->guru_id = $guru->id;
@@ -358,6 +389,59 @@ class KelasController extends BaseAdminController
                 'sekolah_id' => $admin->sekolah_id,
                 'total_rows' => count($rows)
             ]);
+            
+            // Cek terlebih dahulu semua guru_id untuk validasi sebelum membuat perubahan
+            $guruIds = [];
+            
+            // Tahap pertama: Validasi semua data
+            foreach ($rows as $index => $row) {
+                if ($index == 0) {
+                    // Skip header row
+                    continue;
+                }
+
+                // Skip baris kosong
+                if (empty($row[0]) && empty($row[1]) && empty($row[2])) {
+                    continue;
+                }
+                
+                $guru_id = !empty($row[3]) ? trim($row[3]) : null;
+                
+                // Jika ada guru_id, validasi bahwa guru belum digunakan di kelas lain
+                if (!empty($guru_id)) {
+                    // Cek apakah guru_id sudah ada dalam daftar guru yang akan diimpor
+                    if (in_array($guru_id, $guruIds)) {
+                        $errors[] = [
+                            'row' => $index + 2,
+                            'error' => "Guru dengan ID $guru_id sudah ditugaskan ke kelas lain dalam file impor ini"
+                        ];
+                        continue;
+                    }
+                    
+                    // Cek apakah guru sudah mengajar kelas lain di database
+                    $guruMengajarKelas = Kelas::where('guru_id', $guru_id)
+                        ->where('sekolah_id', $admin->sekolah_id)
+                        ->exists();
+                        
+                    if ($guruMengajarKelas) {
+                        $errors[] = [
+                            'row' => $index + 2,
+                            'error' => "Guru dengan ID $guru_id sudah menjadi wali kelas untuk kelas lain"
+                        ];
+                        continue;
+                    }
+                    
+                    // Tambahkan ke list guru_id yang akan digunakan
+                    $guruIds[] = $guru_id;
+                }
+            }
+            
+            // Jika ada error validasi, kembalikan response tanpa melakukan perubahan
+            if (!empty($errors)) {
+                return ResponseBuilder::error(400, "Terdapat error dalam data impor", [
+                    'errors' => $errors
+                ]);
+            }
 
             foreach ($rows as $index => $row) {
                 if ($index == 0) {
@@ -415,25 +499,43 @@ class KelasController extends BaseAdminController
                         }
                     }
 
-                    // Buat atau update data kelas
-                    $kelas = Kelas::updateOrCreate(
-                        [
-                            'nama_kelas' => $nama_kelas,
-                            'tahun' => $tahun,
-                            'sekolah_id' => $admin->sekolah_id
-                        ],
-                        [
+                    // Cek apakah kombinasi nama_kelas, tahun, dan sekolah_id sudah ada
+                    $existingKelas = Kelas::where('nama_kelas', $nama_kelas)
+                        ->where('tahun', $tahun)
+                        ->where('sekolah_id', $admin->sekolah_id)
+                        ->first();
+                        
+                    if ($existingKelas) {
+                        // Jika guru_id berubah, pastikan bahwa guru baru belum mengajar kelas lain
+                        if (!empty($guru_id) && $existingKelas->guru_id != $guru_id) {
+                            // Validasi sudah dilakukan di tahap awal
+                        }
+                        
+                        // Update data kelas yang sudah ada
+                        $existingKelas->update([
                             'tingkat' => $tingkat,
-                            'guru_id' => $guru_id // Bisa null jika tidak ada guru
-                        ]
-                    );
+                            'guru_id' => $guru_id
+                        ]);
+                        
+                        $importedData[] = $existingKelas;
+                    } else {
+                        // Buat atau update data kelas
+                        $kelas = Kelas::create([
+                            'nama_kelas' => $nama_kelas,
+                            'tingkat' => $tingkat,
+                            'tahun' => $tahun,
+                            'guru_id' => $guru_id, 
+                            'sekolah_id' => $admin->sekolah_id
+                        ]);
 
-                    \Log::info('Kelas created/updated', [
-                        'kelas_id' => $kelas->id,
-                        'nama_kelas' => $kelas->nama_kelas
-                    ]);
+                        \Log::info('Kelas created/updated', [
+                            'kelas_id' => $kelas->id,
+                            'nama_kelas' => $kelas->nama_kelas
+                        ]);
 
-                    $importedData[] = $kelas;
+                        $importedData[] = $kelas;
+                    }
+                    
                     $imported++;
 
                 } catch (\Exception $e) {
@@ -492,6 +594,47 @@ class KelasController extends BaseAdminController
             $errors = [];
             $imported = 0;
             
+            // Cek terlebih dahulu semua guru_id untuk validasi sebelum membuat perubahan
+            $guruIds = [];
+            
+            foreach ($kelasData as $index => $data) {
+                if (!empty($data['guru_id'])) {
+                    // Jika guru_id sudah ada dalam list yang akan dibuat, tambahkan error
+                    if (in_array($data['guru_id'], $guruIds)) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'nama_kelas' => $data['nama_kelas'],
+                            'error' => "Guru dengan ID {$data['guru_id']} sudah ditugaskan ke kelas lain dalam batch ini"
+                        ];
+                        continue;
+                    }
+                    
+                    // Cek apakah guru sudah mengajar kelas lain di database
+                    $guruMengajarKelas = Kelas::where('guru_id', $data['guru_id'])
+                        ->where('sekolah_id', $admin->sekolah_id)
+                        ->exists();
+                        
+                    if ($guruMengajarKelas) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'nama_kelas' => $data['nama_kelas'],
+                            'error' => "Guru dengan ID {$data['guru_id']} sudah menjadi wali kelas untuk kelas lain"
+                        ];
+                        continue;
+                    }
+                    
+                    // Tambahkan ke list guru_id yang akan digunakan
+                    $guruIds[] = $data['guru_id'];
+                }
+            }
+            
+            // Jika ada error, kembalikan response sekarang
+            if (!empty($errors)) {
+                return ResponseBuilder::error(400, "Terdapat error dalam data batch", [
+                    'errors' => $errors
+                ]);
+            }
+            
             DB::beginTransaction();
             
             foreach ($kelasData as $index => $data) {
@@ -522,6 +665,23 @@ class KelasController extends BaseAdminController
                         ->first();
                     
                     if ($existingKelas) {
+                        // Jika guru_id berubah, periksa apakah guru baru sudah mengajar kelas lain
+                        if (!empty($data['guru_id']) && $existingKelas->guru_id != $data['guru_id']) {
+                            $guruMengajarKelas = Kelas::where('guru_id', $data['guru_id'])
+                                ->where('sekolah_id', $admin->sekolah_id)
+                                ->where('id', '!=', $existingKelas->id)
+                                ->exists();
+                                
+                            if ($guruMengajarKelas) {
+                                $errors[] = [
+                                    'row' => $index + 1,
+                                    'nama_kelas' => $data['nama_kelas'],
+                                    'error' => "Guru dengan ID {$data['guru_id']} sudah menjadi wali kelas untuk kelas lain"
+                                ];
+                                continue;
+                            }
+                        }
+                        
                         // Update kelas yang sudah ada
                         $existingKelas->update([
                             'tingkat' => $data['tingkat'],

@@ -73,4 +73,14 @@ class UserAuth extends Model implements AuthenticatableContract, AuthorizableCon
     {
         return $this->hasOne(Guru::class, 'user_id', 'id');
     }
+
+    /**
+     * Get the user's full name or email if fullname is empty.
+     *
+     * @return string
+     */
+    public function getFullnameAttribute($value)
+    {
+        return $value ?: $this->email;
+    }
 }

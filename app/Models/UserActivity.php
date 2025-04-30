@@ -48,7 +48,7 @@ class UserActivity extends Model
     
     public function user()
     {
-        return $this->belongsTo(UserAuth::class, 'user_id');
+        return $this->belongsTo(UserAuth::class, 'user_id', 'id')->select(['id', 'fullname', 'email', 'role']);
     }
     
     public function sekolah()

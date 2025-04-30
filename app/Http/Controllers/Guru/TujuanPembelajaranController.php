@@ -184,17 +184,15 @@ class TujuanPembelajaranController extends BaseGuruController
             
             DB::beginTransaction();
             
-            // Cek apakah tujuan pembelajaran masih digunakan oleh nilai
-            if ($tp->nilaiSiswa()->count() > 0) {
-                return ResponseBuilder::error(400, "Tidak dapat menghapus tujuan pembelajaran yang masih memiliki data nilai");
-            }
+            // Hapus semua nilai siswa terkait
+            $tp->nilaiSiswa()->delete();
             
             // Hapus tujuan pembelajaran
             $tp->delete();
             
             DB::commit();
             
-            return ResponseBuilder::success(200, "Berhasil menghapus data tujuan pembelajaran");
+            return ResponseBuilder::success(200, "Berhasil menghapus data tujuan pembelajaran beserta nilainya");
         } catch (\Exception $e) {
             DB::rollBack();
             return ResponseBuilder::error(500, "Gagal menghapus data: " . $e->getMessage());
