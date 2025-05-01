@@ -111,117 +111,20 @@ class ReportController extends BaseAdminController
                 return ResponseBuilder::error(404, "Kelas tidak ditemukan");
             }
 
-            // Debug: Log data awal
-            \Log::info('Initial Data Check:', [
-                'mapel' => $mapel->toArray(),
-                'kelas' => $kelas->toArray(),
-                'user_sekolah_id' => Auth::user()->sekolah_id
-            ]);
+            // Ambil data CP untuk mata pelajaran ini
+            $capaianPembelajaran = CapaianPembelajaran::where('mapel_id', $mapel_id)
+                ->with(['tujuanPembelajaran.nilaiSiswa' => function($q) use ($kelas_id) {
+                    $q->whereHas('siswa', function($q) use ($kelas_id) {
+                        $q->where('kelas_id', $kelas_id);
+                    });
+                }])
+                ->get();
 
-            // Check related data
-            $siswaCount = Siswa::where('kelas_id', $kelas_id)
+            // Ambil data siswa
+            $siswa = Siswa::where('kelas_id', $kelas_id)
                 ->where('sekolah_id', Auth::user()->sekolah_id)
-                ->count();
-            
-            $cpCount = CapaianPembelajaran::where('mapel_id', $mapel_id)
-                ->count();
-            
-            $tpIds = TujuanPembelajaran::whereHas('capaianPembelajaran', function($q) use ($mapel_id) {
-                $q->where('mapel_id', $mapel_id);
-            })->pluck('id');
-
-            // Debug: Log related data counts
-            \Log::info('Related Data Counts:', [
-                'siswa_in_kelas' => $siswaCount,
-                'cp_for_mapel' => $cpCount,
-                'tp_count' => count($tpIds),
-                'tp_ids' => $tpIds
-            ]);
-
-            // Query data nilai with debug info
-            $nilaiQuery = NilaiSiswa::with([
-                'siswa',
-                'tujuanPembelajaran.capaianPembelajaran'
-            ])->whereHas('siswa', function($q) use ($kelas_id, $mapel_id) {
-                $q->where('kelas_id', $kelas_id);
-            })->whereHas('tujuanPembelajaran', function($q) use ($mapel_id) {
-                $q->whereHas('capaianPembelajaran', function($q) use ($mapel_id) {
-                    $q->where('mapel_id', $mapel_id);
-                });
-            });
-
-            // Debug: Log the query
-            \Log::info('Nilai Query:', [
-                'sql' => $nilaiQuery->toSql(),
-                'bindings' => $nilaiQuery->getBindings(),
-                'kelas_id' => $kelas_id,
-                'mapel_id' => $mapel_id
-            ]);
-
-            $nilaiSiswa = $nilaiQuery->get();
-
-            // Debug: Log query results
-            \Log::info('Query Results:', [
-                'count' => $nilaiSiswa->count(),
-                'first_few_records' => $nilaiSiswa->take(3)->toArray()
-            ]);
-
-            if ($nilaiSiswa->isEmpty()) {
-                // Debug: Log detailed error info
-                \Log::error('No Data Found:', [
-                    'kelas_id' => $kelas_id,
-                    'mapel_id' => $mapel_id,
-                    'sekolah_id' => Auth::user()->sekolah_id,
-                    'siswa_count' => $siswaCount,
-                    'cp_count' => $cpCount,
-                    'tp_count' => count($tpIds)
-                ]);
-
-                // Coba query langsung seperti di SQL
-                $rawNilai = \DB::select("
-                    SELECT * FROM nilai_siswa 
-                    WHERE siswa_id IN (
-                        SELECT id FROM siswa 
-                        WHERE kelas_id = ?
-                    ) AND tp_id IN (
-                        SELECT id FROM tujuan_pembelajaran 
-                        WHERE cp_id IN (
-                            SELECT id FROM capaian_pembelajaran 
-                            WHERE mapel_id = ?
-                        )
-                    )
-                ", [$kelas_id, $mapel_id]);
-
-                if (empty($rawNilai)) {
-                    return ResponseBuilder::error(404, "Tidak ada data nilai untuk kelas dan mata pelajaran yang dipilih. Pastikan: \n1. Ada siswa di kelas tersebut \n2. Ada capaian pembelajaran untuk mata pelajaran \n3. Ada tujuan pembelajaran \n4. Ada nilai yang sudah diinput");
-                }
-
-                // Jika data ditemukan dengan raw query, konversi ke collection
-                $nilaiSiswa = collect($rawNilai)->groupBy('siswa_id')
-                    ->map(function($nilai) {
-                        $siswa = Siswa::find($nilai->first()->siswa_id);
-                        return [
-                            'nama' => $siswa->nama,
-                            'nilai' => $nilai->pluck('nilai')->toArray()
-                        ];
-                    })->values();
-            }
-
-            $nilaiSiswa = $nilaiSiswa->groupBy('siswa_id')
-                ->map(function($nilai) {
-                    $siswa = $nilai->first()->siswa;
-                    $nilaiUrut = $nilai->sortBy('tujuanPembelajaran.kode_tp')->values();
-                    
-                    $data = [
-                        'nama' => $siswa->nama,
-                    ];
-                    
-                    foreach($nilaiUrut as $index => $n) {
-                        $data['S-'.($index+1)] = $n->nilai;
-                    }
-                    
-                    return $data;
-                })->values();
+                ->orderBy('nama')
+                ->get();
 
             // Buat spreadsheet baru
             $spreadsheet = new Spreadsheet();
@@ -232,7 +135,6 @@ class ReportController extends BaseAdminController
             
             // Header laporan
             $sheet->setCellValue('A1', 'REKAP NILAI SISWA');
-            
             $sheet->setCellValue('A2', 'Kelas: ' . $kelas->nama_kelas);
             $sheet->setCellValue('A3', 'Mata Pelajaran: ' . $mapel->nama_mapel);
             $sheet->setCellValue('A4', 'Tanggal: ' . date('d/m/Y'));
@@ -241,23 +143,32 @@ class ReportController extends BaseAdminController
             $sheet->setCellValue('A6', 'No');
             $sheet->setCellValue('B6', 'Nama Siswa');
             
-            // Set header nilai (S1-S7)
+            // Set header CP
             $kolom = 'C';
-            for($i = 1; $i <= 7; $i++) {
-                $sheet->setCellValue($kolom.'6', 'S-'.$i);
+            foreach($capaianPembelajaran as $cp) {
+                $sheet->setCellValue($kolom.'6', 'CP-'.substr($cp->kode_cp, -2));
                 $kolom++;
             }
             
             // Isi data
             $row = 7;
-            foreach($nilaiSiswa as $index => $nilai) {
+            foreach($siswa as $index => $s) {
                 $sheet->setCellValue('A'.$row, $index + 1);
-                $sheet->setCellValue('B'.$row, $nilai['nama']);
+                $sheet->setCellValue('B'.$row, $s->nama);
                 
                 $kolom = 'C';
-                for($i = 1; $i <= 7; $i++) {
-                    $nilaiCell = $nilai['S-'.$i] ?? '';
-                    $sheet->setCellValue($kolom.$row, $nilaiCell);
+                foreach($capaianPembelajaran as $cp) {
+                    // Hitung rata-rata nilai TP untuk CP ini
+                    $nilaiTP = collect();
+                    foreach($cp->tujuanPembelajaran as $tp) {
+                        $nilai = $tp->nilaiSiswa->where('siswa_id', $s->id)->first();
+                        if($nilai) {
+                            $nilaiTP->push($nilai->nilai);
+                        }
+                    }
+                    
+                    $rataCP = $nilaiTP->isNotEmpty() ? $nilaiTP->avg() : '';
+                    $sheet->setCellValue($kolom.$row, $rataCP);
                     $kolom++;
                 }
                 $row++;
@@ -265,7 +176,7 @@ class ReportController extends BaseAdminController
             
             // Style tabel
             $lastRow = $row - 1;
-            $lastColumn = 'I';
+            $lastColumn = $kolom;
             
             // Border style
             $borderStyle = [
@@ -286,6 +197,9 @@ class ReportController extends BaseAdminController
             
             // Center align header
             $sheet->getStyle('A6:'.$lastColumn.'6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            
+            // Set format angka untuk nilai
+            $sheet->getStyle('C7:'.$lastColumn.$lastRow)->getNumberFormat()->setFormatCode('0.00');
             
             // Set header untuk download
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
